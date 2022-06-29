@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation BIL INVOICE RDS
+Resources:
+#KMS Key
+  KMS:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - 'kms:*'
+            Resource: 
+              - '*'
+#RDS CLUSTER
+  RDSCLUSTER:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      # AvailabilityZones:
+      # - eu-west-1
+      BackupRetentionPeriod: 1
+      CopyTagsToSnapshot: true
+      # DBClusterIdentifier: bil-microservices-aurora-demo
+      DBClusterParameterGroupName: aurora-mysql57-ssl-required
+      DBSubnetGroupName: bil_microservices-rds-subnet-group
+      DatabaseName: invoiceai_dev
+      DeletionProtection: false
+      Engine: aurora-mysql
+      EngineMode: provisioned
+      EngineVersion: '5.7.mysql_aurora.2.07.2'
+      # HttpEndpointEnabled: false
+      KmsKeyId: !Ref KMS
+      MasterUsername: admin
+      MasterUserPassword: admininvoice
+      Port: 3306
+      PreferredBackupWindow: 03:42-04:12
+      PreferredMaintenanceWindow: thu:22:34-thu:23:04
+      StorageEncrypted: true
+      VpcSecurityGroupIds:
+       - sg-0ece504dc54905150
+#RDS DATABASE
+  DB:
+    Type: AWS::RDS::DBInstance
+    # DependsOn: RDSCLUSTER
+    Properties: 
+      # AllocatedStorage: 20
+      # AssociatedRoles: []
+      AutoMinorVersionUpgrade: true
+      # AvailabilityZones:
+      # - eu-west-1c
+      # BackupRetentionPeriod: 1
+      # CACertificateIdentifier: rds-ca-2019
+      #CharacterSetName: String
+      CopyTagsToSnapshot: false
+      DBClusterIdentifier: !Ref RDSCLUSTER
+      # DBClusterParameterGroup: default.mariadb-10.6.7
+      DBInstanceClass: db.r5.large
+      DBInstanceIdentifier: bil-microservices-aurora-invoice-demo
+      # DBName: invoiceaidevv
+      DBParameterGroupName: default.aurora-mysql5.7
+      # DBSnapshotIdentifier: String
+      DBSubnetGroupName: bil_microservices-rds-subnet-group
+      DeleteAutomatedBackups: true
+      # DeletionProtection: false
+      # Domain: String
+      # DomainIAMRoleName: String
+      # EnableCloudwatchLogsExports: 
+      #   - audit
+      #   - error
+      #   - general
+      #   - slowquery
+      # EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights: true
+      Engine: aurora-mysql
+      # EngineVersion: 10.6.7
+      # KmsKeyId: !Ref KMS
+      LicenseModel: general-public-license
+      # MasterUsername: admin
+      # MasterUserPassword: admininvoice
+      # MaxAllocatedStorage: Integer
+      MonitoringInterval: 60
+      MonitoringRoleArn: arn:aws:iam::871157674040:role/rds-monitoring-role
+      # MultiAZ: true
+      # OptionGroupName: String
+      # PerformanceInsightsKMSKeyId: String
+      # PerformanceInsightsRetentionPeriod: Integer
+      # Port: 3306
+      # PreferredBackupWindow: 03:42-04:12
+      # PreferredMaintenanceWindow: thu:22:34-thu:23:04
+      # ProcessorFeatures: 
+      #   - ProcessorFeature
+      # PromotionTier: Integer
+      PubliclyAccessible: true
+      # SourceDBInstanceIdentifier: String
+      # SourceRegion: String
+      # StorageEncrypted: true
+      # StorageType: gp2
+      # UseDefaultProcessorFeatures: Boolean
+      # VPCSecurityGroups: 
+      #   - sg-0ece504dc54905150
+
+#aws rds describe-db-instances --db-instance-identifier bil-microservices-aurora-instance-1 --output yaml  
+# aws rds describe-db-engine-versions \
+#     --engine mariadb / 

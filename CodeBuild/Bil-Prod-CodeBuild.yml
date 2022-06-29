@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation Prod
+Resources:
+  ProdUnitTestInvoiceExtractionApp:
+      Type: AWS::CodeBuild::Project
+      # DependsOn: EFSDEMO
+      Properties:
+        Name: unittest-prod-invoice_extraction_app-demo
+        Artifacts:
+          EncryptionDisabled: false
+          Name: unittest-prod-invoice_extraction_app
+          Packaging: NONE
+          Type: CODEPIPELINE
+        EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+        Environment:
+          Type: LINUX_CONTAINER
+          ComputeType: BUILD_GENERAL1_SMALL
+          Image: '871157674040.dkr.ecr.eu-west-1.amazonaws.com/prod-invoice_extraction_app:latest'
+          ImagePullCredentialsType: SERVICE_ROLE
+          EnvironmentVariables:
+            - Name: ENV
+              Value: PROD
+              Type: PLAINTEXT
+          PrivilegedMode: True
+        FileSystemLocations:
+          - Identifier: models
+            Location: 'fs-095850aa2d9d290eb.efs.eu-west-1.amazonaws.com:/prod/models'
+            MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+            MountPoint: /models
+            Type: EFS
+          - Identifier: config
+            Location: 'fs-095850aa2d9d290eb.efs.eu-west-1.amazonaws.com:/prod/config'
+            MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+            MountPoint: /config
+            Type: EFS
+          - Identifier: data
+            Location: 'fs-095850aa2d9d290eb.efs.eu-west-1.amazonaws.com:/prod/app/data'
+            MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+            MountPoint: /app/data
+            Type: EFS
+        LogsConfig:
+          S3Logs:
+            EncryptionDisabled: false
+            Location: codepipeline-eu-west-1-746302643285/logs/unittest-prod-invoice_extraction_app
+            Status: ENABLED
+        QueuedTimeoutInMinutes: 480
+        ServiceRole: arn:aws:iam::871157674040:role/codebuild-unittest-dev-invoice_extraction_app-service-role
+        Source:
+          BuildSpec: 'aws/unit/buildspec.yml'
+          Type: CODEPIPELINE
+        TimeoutInMinutes: 60
+        Visibility: PRIVATE
+        VpcConfig:
+          SecurityGroupIds:
+          - sg-09d40f93776324bef
+          Subnets:
+          - subnet-0e87cfbd496675012
+          - subnet-05677243c8da07bf5
+          VpcId: vpc-047fce4aba1e80567

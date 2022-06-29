@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+
+  EFSDEMO:
+    Type: AWS::EFS::FileSystem
+    Properties: 
+      BackupPolicy: 
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags: 
+      - Key: Name
+        Value: 'invoice_data_extraction-demo-demo'
+      KmsKeyId: !GetAtt
+        - key
+        - Arn 
+      LifecyclePolicies: 
+      - TransitionToIA: AFTER_30_DAYS
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-05677243c8da07bf5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-0cee8c1d17cecfce5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  key:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - 'kms:*'
+            Resource: 
+              - '*'
+ 
+  EC2EFS:
+      Type: AWS::EC2::Instance
+      DependsOn: [MountTargetResource1, MountTargetResource2]
+      Properties: 
+        AvailabilityZone: eu-west-1a
+        BlockDeviceMappings: 
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+        EbsOptimized: false
+        ImageId: ami-0c1bc246476a5572b
+        InstanceType: t2.micro
+        KeyName: bil-demo
+        PrivateDnsNameOptions: 
+          EnableResourceNameDnsAAAARecord: false
+          EnableResourceNameDnsARecord: true
+          HostnameType: ip-name
+        SecurityGroupIds: 
+          - sg-0da6e753474f5870d
+          - sg-082e50a6833277151
+        SourceDestCheck: true
+        SubnetId: subnet-05677243c8da07bf5
+        Tags: 
+        - Key: Name
+          Value: EFS-EC2-Demo-demo
+        Tenancy: default
+        UserData:
+          Fn::Base64: 
+            !Sub |
+                #!/bin/bash -xe
+                sudo mkdir /efs
+                sudo yum install -y amazon-efs-utils
+                sudo mount -t efs -o tls ${EFSDEMO.FileSystemId}:/ /efs
+                sudo mkdir -p /efs/dev/app/data
+                sudo mkdir -p /efs/dev/models
+                sudo mkdir -p /efs/dev/config
+
+  ECSServiceInvoiceExtractionAppDemo:
+    Type: AWS::ECS::Service
+    DependsOn: DevInvoiceTaskDef
+    Properties: 
+      Cluster: arn:aws:ecs:eu-west-1:871157674040:cluster/bil-microservices-demo
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: CODE_DEPLOY
+      DesiredCount: 2
+      EnableECSManagedTags: true
+      EnableExecuteCommand: false  
+      LaunchType: EC2
+      LoadBalancers:
+      - ContainerName: app-demo
+        ContainerPort: 8080
+        TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/fc25ec8509732606
+      PlacementStrategies:
+      - Field: attribute:ecs.availability-zone
+        Type: spread
+      - Field: instanceId
+        Type: spread
+      SchedulingStrategy: REPLICA
+      ServiceName: dev-invoice_extraction_app-demo-demo
+      TaskDefinition: !Ref DevInvoiceTaskDef
+
+
+  DevInvoiceTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: [MountTargetResource1, MountTargetResource2, EC2EFS]
+    Properties:
+      ContainerDefinitions:
+      - Cpu: 0
+        Essential: true
+        Image: 871157674040.dkr.ecr.eu-west-1.amazonaws.com/dev-invoice_extraction_app:f603b9d
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-create-group: 'true'
+            awslogs-group: /ecs/invoice_extraction_app-demo
+            awslogs-region: eu-west-1
+            awslogs-stream-prefix: /dev
+        MemoryReservation: 1024
+        MountPoints:
+        - ContainerPath: /app/data
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-data
+        - ContainerPath: /models
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-models
+        - ContainerPath: /config
+          ReadOnly: true
+          SourceVolume: efs-invoice_extraction-config
+        Name: app-demo
+        PortMappings:
+        - ContainerPort: 8080
+          HostPort: 0
+          Protocol: tcp
+        Secrets:
+        - Name: ACCESS_LOG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.ACCESS_LOG
+        - Name: RELOAD
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.RELOAD
+        - Name: DEBUG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DEBUG
+        - Name: DEV_PORT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DEV_PORT
+        - Name: ENVIRONMENT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.ENVIRONMENT
+        - Name: PATH_PREFIX
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.PATH_PREFIX
+        - Name: LOG_LEVEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.LOG_LEVEL
+        - Name: DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DATA_DIR
+        - Name: TEST_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.TEST_DIR
+        - Name: AWS_ACCESS_KEY_ID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_ACCESS_KEY_ID
+        - Name: AWS_SECRET_ACCESS_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_SECRET_ACCESS_KEY
+        - Name: AWS_S3_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_S3_US_BUCKET
+        - Name: AWS_S3_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_S3_EU_BUCKET
+        - Name: CORE_LINEITEMS_EXTRACTION
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.CORE_LINEITEMS_EXTRACTION
+        - Name: GCDOCAI_TOKENPATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_TOKENPATH
+        - Name: GCDOCAI_PROJECTID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_PROJECTID
+        - Name: GCDOCAI_US_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR
+        - Name: GCDOCAI_EU_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR
+        - Name: GCDOCAI_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_BUCKET
+        - Name: GCDOCAI_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_BUCKET
+        - Name: GCDOCAI_US_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_EU_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_US_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_INVOICE
+        - Name: GCDOCAI_EU_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_INVOICE
+        - Name: GCDOCAI_US_PROCESSOR_UTILITY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_UTILITY
+        - Name: AZURE_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_ENDPOINT
+        - Name: AZURE_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_KEY
+        - Name: AZURE_FORM_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_FORM_ENDPOINT
+        - Name: AZURE_FORM_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_FORM_KEY
+        - Name: PDFTOTEXT_BIN_PATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.PDFTOTEXT_BIN_PATH
+        - Name: CUSTOMER_DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.CUSTOMER_DATA_DIR
+        - Name: SUPPLIER_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.SUPPLIER_MODEL
+        - Name: BILLTO_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.BILLTO_MODEL
+        - Name: DB_CONN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.DEMO-INVOICE_EXTRACTION.DB_CONN
+        - Name: API_KEY_NAME
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_NAME
+        - Name: API_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY
+        - Name: API_KEY_USER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_USER
+        - Name: API_KEY_ADMIN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_ADMIN
+        volumesFrom: []
+      ExecutionRoleArn: arn:aws:iam::871157674040:role/ecsTaskExecutionRole
+      Family: dev_invoice_extraction_app-demo
+      Volumes:
+      - Name: efs-invoice_extraction-data
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/app/data
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-models
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/models
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-config
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/config
+          TransitEncryption: ENABLED
+    
+
+

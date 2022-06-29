@@ -1,0 +1,956 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation Prod
+Parameters:
+  BranchName:
+    Description: CodeCommit branch name
+    Type: String
+    Default: main
+  RepoName:
+    Description: CodeComit repository name
+    Type: String
+    Default: invoice_extraction-demo
+  Build1:
+    Description: CodeBuild Invoice Extraction
+    Type: String
+    Default: prod-invoice_extraction_app-demo
+  Build2:
+    Description: CodeBuild Unit Test
+    Type: String
+    Default: unittest-prod-invoice_extraction_app-demo
+  EFSDEMO:
+    Description: CodeBuild Unit Test
+    Type: String
+    Default: fs-095850aa2d9d290eb
+  ALB:
+    Description: Load Balancer ARN
+    Type: String
+    Default: arn:aws:elasticloadbalancing:eu-west-1:871157674040:loadbalancer/app/bil-microservices-elb-01-demo/3e905005ebd00a08
+    
+  VpcId:
+    Type: String
+    Description: >
+      Optional - Specifies the ID of an existing VPC in which to launch
+      your container instances. If you specify a VPC ID, you must specify a list of
+      existing subnets in that VPC. If you do not specify a VPC ID, a new VPC is created
+      with atleast 1 subnet.
+    Default: 'vpc-047fce4aba1e80567'
+
+  Cluster:
+    Description: Please provide the ECS Cluster ID that this service should run on
+    Type: String
+    Default: bil-microservices-demo
+
+  EcsService:
+    Description: Please provide the ECSService ID that this service should run on
+    Type: String
+    Default: prod-invoice_extraction_app-demo
+
+  RepositoryName:
+      Description: Enter comma-delimited list for Repository Names
+      Type: CommaDelimitedList
+      Default: "dev-invoice_extraction_app-demo, test-invoice_extraction_app-demo, prod-invoice_extraction_app-demo"
+  EcsAmiId:
+    Type: String
+    Description: Specifies the AMI ID for your container instances.
+    Default: ami-07952635e5a4cdaf1
+  EcsInstanceType:
+    Type: CommaDelimitedList
+    Description: >
+      Specifies the EC2 instance type for your container instances.
+      Defaults to m4.large
+    Default: m5n.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Type: String
+    Description: >
+      Optional - Specifies the name of an existing Amazon EC2 key pair
+      to enable SSH access `to the EC2 instances in your cluster.
+    Default: 'bil-demo'
+  VpcId:
+    Type: String
+    Description: >
+      Optional - Specifies the ID of an existing VPC in which to launch
+      your container instances. If you specify a VPC ID, you must specify a list of
+      existing subnets in that VPC. If you do not specify a VPC ID, a new VPC is created
+      with atleast 1 subnet.
+    Default: 'vpc-047fce4aba1e80567'
+    ConstraintDescription: >
+      VPC Id must begin with 'vpc-' or leave blank to have a
+      new VPC created
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: >
+      Optional - Specifies the Comma separated list of existing VPC Subnet
+      Ids where ECS instances will run
+    Default: 'subnet-05677243c8da07bf5, subnet-0e87cfbd496675012'
+  SecurityGroupId:
+    Type: String
+    Description: >
+      Optional - Specifies the Security Group Id of an existing Security
+      Group. Leave blank to have a new Security Group created
+    Default: 'sg-09d40f93776324bef'
+  VpcCidr:
+    Type: String
+    Description: Optional - Specifies the CIDR Block of VPC
+    Default: '10.0.0.0/16'
+
+Resources:
+#Policy1
+  PRODUNITTESTIAMPOLICY1:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'AWS ECS AUTOSCALING POLICY'
+      ManagedPolicyName: CodeBuildBasePolicy-unittest-prod-invoice_extraction_app-eu-west-1-demo
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            Resource: 
+            # - "arn:aws:logs:eu-west-1:871157674040:log-group:/aws/codebuild/unittest-prod-invoice_extraction_app-demo"
+            # - "arn:aws:logs:eu-west-1:871157674040:log-group:/aws/codebuild/unittest-prod-invoice_extraction_app-demo:*"
+            - "*"            
+          - Effect: Allow
+            Action: 
+            - "s3:PutObject"
+            - "s3:GetObject"
+            - "s3:GetObjectVersion"
+            - "s3:GetBucketAcl"
+            - "s3:GetBucketLocation"
+            Resource: 
+            - "arn:aws:s3:::codepipeline-eu-west-1-*"
+            - "*"
+          - Effect: Allow
+            Action: 
+            - "s3:PutObject"
+            - "s3:GetBucketAcl"
+            - "s3:GetBucketLocation"
+            Resource: 
+            # - "arn:aws:s3:::codepipeline-eu-west-1-746302643285"
+            # - "arn:aws:s3:::codepipeline-eu-west-1-746302643285/*"
+            - "*"
+          - Effect: Allow
+            Action: 
+            - "codebuild:CreateReportGroup"
+            - "codebuild:CreateReport"
+            - "codebuild:UpdateReport"
+            - "codebuild:BatchPutTestCases"
+            - "codebuild:BatchPutCodeCoverages"
+            Resource: 
+            - "*"
+            # - "arn:aws:codebuild:eu-west-1:871157674040:report-group/unittest-prod-invoice_extraction_app-demo*"
+#Policy 2
+  PRODUNITTESTIAMPOLICY2:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'CodeBuild VPC Policy UNITTEST PROD'
+      ManagedPolicyName: CodeBuildVpcPolicy-unittest-prod-invoice_extraction_app-eu-west-1-demo
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - ec2:CreateNetworkInterface
+          - ec2:DescribeDhcpOptions
+          - ec2:DescribeNetworkInterfaces
+          - ec2:DeleteNetworkInterface
+          - ec2:DescribeSubnets
+          - ec2:DescribeSecurityGroups
+          - ec2:DescribeVpcs
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - ec2:CreateNetworkInterfacePermission
+          Resource: 
+            - "*"          
+          # arn:aws:ec2:eu-west-1:871157674040:network-interface/*
+          Condition:
+            StringEquals:
+              ec2:Subnet:
+              - arn:aws:ec2:eu-west-1:871157674040:subnet/subnet-0e87cfbd496675012
+              - arn:aws:ec2:eu-west-1:871157674040:subnet/subnet-05677243c8da07bf5
+              ec2:AuthorizedService: codebuild.amazonaws.com
+#Policy 3
+  PRODUNITTESTIAMPOLICY3:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'SSM PROD INVOICE EXTRACTION'
+      ManagedPolicyName: "SSM-PROD.INVOICE_EXTRACTION-demo"
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Sid: VisualEditor0
+          Effect: Allow
+          Action: ssm:DescribeParameters
+          Resource: "*"
+        - Sid: VisualEditor1
+          Effect: Allow
+          Action: ssm:GetParameters
+          Resource:
+            - "*"          
+          #  "arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION*"
+
+#UNITTEST CODEBUILD ROLE
+  UNITTESTROLE:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: bil-codebuild-unittest-invoice-prod-role
+      ManagedPolicyArns: 
+        - !Ref PRODUNITTESTIAMPOLICY1
+        - !Ref PRODUNITTESTIAMPOLICY2
+        - !Ref PRODUNITTESTIAMPOLICY3
+      RoleName: codebuild-unittest-prod-invoice_extraction_app-service-role-demo
+#Policy 4 Code pipeline
+  PRODCPIAMPOLICY:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'CodePipeline Invoice AI Prod'
+      ManagedPolicyName: "AWSCodePipelineServiceRole-prod-invoice_extraction_app-demo"
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - iam:PassRole
+          Resource: "*"
+          Effect: Allow
+          Condition:
+            StringEqualsIfExists:
+              iam:PassedToService:
+              - cloudformation.amazonaws.com
+              - elasticbeanstalk.amazonaws.com
+              - ec2.amazonaws.com
+              - ecs-tasks.amazonaws.com
+        - Action:
+          - codecommit:CancelUploadArchive
+          - codecommit:GetBranch
+          - codecommit:GetCommit
+          - codecommit:GetRepository
+          - codecommit:GetUploadArchiveStatus
+          - codecommit:UploadArchive
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - codedeploy:CreateDeployment
+          - codedeploy:GetApplication
+          - codedeploy:GetApplicationRevision
+          - codedeploy:GetDeployment
+          - codedeploy:GetDeploymentConfig
+          - codedeploy:RegisterApplicationRevision
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - codestar-connections:UseConnection
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - elasticbeanstalk:*
+          - ec2:*
+          - elasticloadbalancing:*
+          - autoscaling:*
+          - cloudwatch:*
+          - s3:*
+          - sns:*
+          - cloudformation:*
+          - rds:*
+          - sqs:*
+          - ecs:*
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - lambda:InvokeFunction
+          - lambda:ListFunctions
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - opsworks:CreateDeployment
+          - opsworks:DescribeApps
+          - opsworks:DescribeCommands
+          - opsworks:DescribeDeployments
+          - opsworks:DescribeInstances
+          - opsworks:DescribeStacks
+          - opsworks:UpdateApp
+          - opsworks:UpdateStack
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - cloudformation:CreateStack
+          - cloudformation:DeleteStack
+          - cloudformation:DescribeStacks
+          - cloudformation:UpdateStack
+          - cloudformation:CreateChangeSet
+          - cloudformation:DeleteChangeSet
+          - cloudformation:DescribeChangeSet
+          - cloudformation:ExecuteChangeSet
+          - cloudformation:SetStackPolicy
+          - cloudformation:ValidateTemplate
+          Resource: "*"
+          Effect: Allow
+        - Action:
+          - codebuild:BatchGetBuilds
+          - codebuild:StartBuild
+          - codebuild:BatchGetBuildBatches
+          - codebuild:StartBuildBatch
+          Resource: "*"
+          Effect: Allow
+        - Effect: Allow
+          Action:
+          - devicefarm:ListProjects
+          - devicefarm:ListDevicePools
+          - devicefarm:GetRun
+          - devicefarm:GetUpload
+          - devicefarm:CreateUpload
+          - devicefarm:ScheduleRun
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - servicecatalog:ListProvisioningArtifacts
+          - servicecatalog:CreateProvisioningArtifact
+          - servicecatalog:DescribeProvisioningArtifact
+          - servicecatalog:DeleteProvisioningArtifact
+          - servicecatalog:UpdateProduct
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - cloudformation:ValidateTemplate
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - ecr:DescribeImages
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - states:DescribeExecution
+          - states:DescribeStateMachine
+          - states:StartExecution
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - appconfig:StartDeployment
+          - appconfig:StopDeployment
+          - appconfig:GetDeployment
+          Resource: "*"        
+          #  "arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION*"
+
+#CODEPIPELINE PROD INVOICEAI
+  PRODCPIAMROLE:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: "AWSCodePipelineServiceRole prod-invoice_extraction_app"
+      ManagedPolicyArns: 
+        - !Ref PRODCPIAMPOLICY
+      RoleName: AWSCodePipelineServiceRole-prod-invoice_extraction-demo
+
+#Target Group 1
+  ECSTARGETGROUP1PRODINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 5013
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-prod-tg-3
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VpcId
+    # DependsOn: ALB
+#Target Group 2
+  ECSTARGETGROUP2PRODINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 5013
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-prod-tg-4
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VpcId
+    # DependsOn: ALB
+#Listener 1
+  Listener1:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+        - Order: 1
+          TargetGroupArn: !Ref ECSTARGETGROUP1PRODINVOICE
+          Type: forward
+        LoadBalancerArn: !Ref ALB
+        Port: 5013
+        Protocol: HTTP
+#Listener 2
+  Listener2:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Order: 1
+          TargetGroupArn: !Ref ECSTARGETGROUP1PRODINVOICE
+          Type: forward
+      LoadBalancerArn: !Ref ALB
+      Port: 5014
+      Protocol: HTTP
+
+
+  ECSServiceInvoiceExtractionAppDemo:
+    Type: AWS::ECS::Service
+    DependsOn: [ProdInvoiceTaskDef, ECSTARGETGROUP1PRODINVOICE]
+    Properties: 
+      Cluster: !Ref Cluster
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: CODE_DEPLOY
+      DesiredCount: 2
+      EnableECSManagedTags: true
+      EnableExecuteCommand: false  
+      LaunchType: EC2
+      LoadBalancers:
+      - ContainerName: app-demo
+        ContainerPort: 8080
+        TargetGroupArn: !Ref ECSTARGETGROUP1PRODINVOICE
+      PlacementStrategies:
+      - Field: attribute:ecs.availability-zone
+        Type: spread
+      - Field: instanceId
+        Type: spread
+      SchedulingStrategy: REPLICA
+      ServiceName: prod-invoice_extraction_app-demo-demo
+      TaskDefinition: !Ref ProdInvoiceTaskDef
+
+#Task Definition
+  ProdInvoiceTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Cpu: 0
+        Essential: true
+        Image: 871157674040.dkr.ecr.eu-west-1.amazonaws.com/prod-invoice_extraction_app:6329197
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-create-group: 'true'
+            awslogs-group: /ecs/invoice_extraction_app-demo
+            awslogs-region: eu-west-1
+            awslogs-stream-prefix: /prod
+        MemoryReservation: 1024
+        MountPoints:
+        - ContainerPath: /app/data
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-data
+        - ContainerPath: /models
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-models
+        - ContainerPath: /config
+          ReadOnly: true
+          SourceVolume: efs-invoice_extraction-config
+        Name: app-demo
+        PortMappings:
+        - ContainerPort: 8080
+          HostPort: 0
+          Protocol: tcp
+        Secrets:
+        - Name: ACCESS_LOG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.ACCESS_LOG
+        - Name: RELOAD
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.RELOAD
+        - Name: DEBUG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.DEBUG
+        - Name: DEV_PORT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.DEV_PORT
+        - Name: ENVIRONMENT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.ENVIRONMENT
+        - Name: PATH_PREFIX
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.PATH_PREFIX
+        - Name: LOG_LEVEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.LOG_LEVEL
+        - Name: DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.DATA_DIR
+        - Name: TEST_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.TEST_DIR
+        - Name: AWS_ACCESS_KEY_ID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AWS_ACCESS_KEY_ID
+        - Name: AWS_SECRET_ACCESS_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AWS_SECRET_ACCESS_KEY
+        - Name: AWS_S3_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AWS_S3_US_BUCKET
+        - Name: AWS_S3_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AWS_S3_EU_BUCKET
+        - Name: CORE_LINEITEMS_EXTRACTION
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.CORE_LINEITEMS_EXTRACTION
+        - Name: GCDOCAI_TOKENPATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_TOKENPATH
+        - Name: GCDOCAI_PROJECTID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_PROJECTID
+        - Name: GCDOCAI_US_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR
+        - Name: GCDOCAI_EU_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR
+        - Name: GCDOCAI_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_US_BUCKET
+        - Name: GCDOCAI_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_EU_BUCKET
+        - Name: GCDOCAI_US_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_EU_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_US_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_INVOICE
+        - Name: GCDOCAI_EU_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_INVOICE
+        - Name: GCDOCAI_US_PROCESSOR_UTILITY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_UTILITY
+        - Name: AZURE_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AZURE_ENDPOINT
+        - Name: AZURE_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AZURE_KEY
+        - Name: AZURE_FORM_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AZURE_FORM_ENDPOINT
+        - Name: AZURE_FORM_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.AZURE_FORM_KEY
+        - Name: PDFTOTEXT_BIN_PATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.PDFTOTEXT_BIN_PATH
+        - Name: CUSTOMER_DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.CUSTOMER_DATA_DIR
+        - Name: SUPPLIER_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.SUPPLIER_MODEL
+        - Name: BILLTO_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.BILLTO_MODEL
+        - Name: DB_CONN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.DB_CONN
+        - Name: API_KEY_NAME
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.API_KEY_NAME
+        - Name: API_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.API_KEY
+        - Name: API_KEY_USER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.API_KEY_USER
+        - Name: API_KEY_ADMIN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION.API_KEY_ADMIN
+        volumesFrom: []
+      ExecutionRoleArn: arn:aws:iam::871157674040:role/ecsTaskExecutionRole
+      Family: prod_invoice_extraction_app-demo
+      Volumes:
+      - Name: efs-invoice_extraction-data
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /prod/app/data
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-models
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /prod/models
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-config
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /prod/config
+          TransitEncryption: ENABLED
+#Deployment App
+  Appcodedeploy:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: AppECS-bil-microservices-prod-invoice_extraction_app-demo-demo
+      ComputePlatform: ECS
+#Deployment Group
+  DgpECSBilMicroservicesProdInvoiceExtractionAppDemo:
+      Type: AWS::CodeDeploy::DeploymentGroup
+      DependsOn: Appcodedeploy
+      Properties: 
+        # AlarmConfiguration: 
+        #   AlarmConfiguration
+        ApplicationName: !Ref Appcodedeploy
+        AutoRollbackConfiguration: 
+          Enabled: true
+          Events:
+          - DEPLOYMENT_STOP_ON_REQUEST
+          - DEPLOYMENT_FAILURE
+        BlueGreenDeploymentConfiguration:
+          DeploymentReadyOption:
+            ActionOnTimeout: CONTINUE_DEPLOYMENT
+            WaitTimeInMinutes: 0
+          TerminateBlueInstancesOnDeploymentSuccess:
+            Action: TERMINATE
+            TerminationWaitTimeInMinutes: 60
+        DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+        DeploymentGroupName: DgpECS-bil-microservices-prod-invoice_extraction_app-demo
+        DeploymentStyle: 
+          DeploymentOption: WITH_TRAFFIC_CONTROL
+          DeploymentType: BLUE_GREEN
+        ECSServices: 
+        - ClusterName: !Ref Cluster
+          ServiceName: !GetAtt ECSServiceInvoiceExtractionAppDemo.Name
+        LoadBalancerInfo: 
+          TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+              - !Ref Listener1
+            TargetGroups:
+            - Name: !GetAtt ECSTARGETGROUP1PRODINVOICE.TargetGroupName
+            - Name: !GetAtt ECSTARGETGROUP2PRODINVOICE.TargetGroupName
+            TestTrafficRoute:
+              ListenerArns:
+              - !Ref Listener2
+        OutdatedInstancesStrategy: UPDATE
+        ServiceRoleArn: arn:aws:iam::871157674040:role/CodeDeployServiceRole
+      DependsOn: ECSServiceInvoiceExtractionAppDemo
+
+
+#S3 Bucket 
+  CodePipelineArtifactStoreBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties: 
+      AccessControl: BucketOwnerFullControl
+      BucketName: codepipeline-eu-west-1-demo-prod
+      MetricsConfigurations: 
+        - Id: EntireBucket
+      OwnershipControls: 
+        Rules:
+         - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+#S3 Policy
+  CodePipelineArtifactStoreBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref CodePipelineArtifactStoreBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': 'aws:kms'
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+#Cloudwatch Events Role
+  AmazonCloudWatchEventRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'codepipeline:StartPipelineExecution'
+                Resource: !Join 
+                  - ''
+                  - - 'arn:aws:codepipeline:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':'
+                    - !Ref AppPipeline
+#CloudWatch Events Rule
+  AmazonCloudWatchEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - CodeCommit Repository State Change
+        resources:
+          - !Join 
+            - ''
+            - - 'arn:aws:codecommit:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref RepoName
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - master
+      Targets:
+        - Arn: !Join 
+            - ''
+            - - 'arn:aws:codepipeline:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref AppPipeline
+          RoleArn: !GetAtt 
+            - AmazonCloudWatchEventRole
+            - Arn
+          Id: codepipeline-AppPipeline
+#Code Build 
+  ProdInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref Build1
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: eu-west-1
+            Type: PLAINTEXT
+          - Name: AWS_ACCOUNT_ID
+            Value: '871157674040'
+            Type: PLAINTEXT
+          - Name: IMAGE_REPO_NAME
+            Value: prod-invoice_extraction_app
+            Type: PLAINTEXT
+          - Name: ENV
+            Value: TEST
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      QueuedTimeoutInMinutes: 480
+      SecondaryArtifacts:
+      - ArtifactIdentifier: ImageArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: prod-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      - ArtifactIdentifier: DefinitionArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: prod-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      ServiceRole: arn:aws:iam::871157674040:role/service-role/codebuild-prod-invoice_extraction_app-service-role
+      Source:
+        BuildSpec: aws/buildspec.yml
+        GitCloneDepth: 1
+        Location: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/invoice_extraction
+        Type: CODECOMMIT
+      SourceVersion: refs/heads/master
+      TimeoutInMinutes: 60
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: False
+          Location: !Ref CodePipelineArtifactStoreBucket
+          Status: ENABLED
+#CodeBuild Invoice Unit Testing Prod
+  ProdUnitTestInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    # DependsOn: EFSDEMO
+    Properties:
+      Name: !Ref Build2
+      Artifacts:
+        EncryptionDisabled: false
+        Name: unittest-prod-invoice_extraction_app
+        Packaging: NONE
+        Type: CODEPIPELINE
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: '871157674040.dkr.ecr.eu-west-1.amazonaws.com/prod-invoice_extraction_app:latest'
+        ImagePullCredentialsType: CODEBUILD
+        EnvironmentVariables:
+          - Name: ENV
+            Value: PROD
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      FileSystemLocations:
+        - Identifier: models
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/prod/app/data'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /models
+          Type: EFS
+        - Identifier: config
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/prod/app/data'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /config
+          Type: EFS
+        - Identifier: data
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/prod/app/data'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /app/data
+          Type: EFS
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: false
+          Location: !Ref CodePipelineArtifactStoreBucket
+          Status: ENABLED
+      QueuedTimeoutInMinutes: 480
+      ServiceRole: !Ref UNITTESTROLE
+      Source:
+        BuildSpec: 'aws/unit/buildspec.yml'
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 60
+      Visibility: PRIVATE
+      VpcConfig:
+        SecurityGroupIds:
+        - sg-09d40f93776324bef
+        Subnets:
+        - subnet-0e87cfbd496675012
+        - subnet-05677243c8da07bf5
+        VpcId: vpc-047fce4aba1e80567
+
+#Invoice Extraction Prod Pipeline
+  AppPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PRODCPIAMROLE.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: !Ref BranchName
+                RepositoryName: !Ref RepoName
+                OutputArtifactFormat: CODE_ZIP
+                PollForSourceChanges: false
+              Namespace: SourceVariables
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Build
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref Build1
+              OutputArtifacts:
+                - Name: DefinitionArtifact
+                - Name: ImageArtifact
+              Namespace: BuildVariables
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Test
+          Actions:
+            - Name: Test
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref Build2
+              OutputArtifacts: []
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              InputArtifacts:
+                - Name: DefinitionArtifact
+                - Name: ImageArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeployToECS
+              Configuration:
+                AppSpecTemplateArtifact: DefinitionArtifact
+                AppSpecTemplatePath: appspec.yml
+                ApplicationName: !Ref Appcodedeploy
+                DeploymentGroupName: !Ref DgpECSBilMicroservicesProdInvoiceExtractionAppDemo
+                Image1ArtifactName: ImageArtifact
+                Image1ContainerName: IMAGE1_NAME
+                TaskDefinitionTemplateArtifact: DefinitionArtifact
+                TaskDefinitionTemplatePath: taskdef.json
+              Region: eu-west-1                
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineArtifactStoreBucket
+

@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  Listener1:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+          - ForwardConfig:
+              TargetGroupStickinessConfig:
+                Enabled: false
+              TargetGroups:
+                - TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/804f21d70b008a47
+                  Weight: 1
+            Order: 1
+            TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/804f21d70b008a47
+            Type: forward
+        LoadBalancerArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:loadbalancer/app/bil-microservices-elb-01/7c56c7ed89b1d129
+        Port: 8015
+        Protocol: HTTP
+
+# aws elbv2 describe-listeners --listener-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/a22e6350b245b422
+  Listeners:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroupStickinessConfig:
+              Enabled: false
+            TargetGroups:
+              - TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/804f21d70b008a47
+                Weight: 1
+          Order: 1
+          TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/804f21d70b008a47
+          Type: forward
+      LoadBalancerArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:loadbalancer/app/bil-microservices-elb-01/7c56c7ed89b1d129
+      Port: 8016
+      Protocol: HTTP

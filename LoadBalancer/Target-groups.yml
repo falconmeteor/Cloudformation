@@ -1,0 +1,52 @@
+# aws elbv2 describe-target-groups --target-group-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-1/bbd637d607bbed47
+# aws elbv2 describe-target-groups --target-group-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-2/6a09e6a0983c0a2e
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  ECSTARGETGROUP1DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-3
+      Targets:
+      - Id: i-0f5d32d6d313b2784
+        Port: 80
+      - Id: i-0b15ea0c556e05b31
+        Port: 80
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: vpc-047fce4aba1e80567
+  ECSTARGETGROUP2DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-4
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: vpc-047fce4aba1e80567
+# aws elbv2 describe-listeners --listener-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/ecf5bf77f6780420
+

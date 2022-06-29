@@ -1,0 +1,287 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation template to create DEV environment Parameters in Parameter Store for Invoice Extraction
+Resources:
+  Paremeter1:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_SPLITTER
+      SecretString: 
+        8fb5bffcee6f8d61
+  Paremeter2:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.SUPPLIER_MODEL
+        Value: 's3://invoice-extraction-us/app/models/dev/supplier_model.latest.pkl'
+        Tier: Standard
+        Type: String
+  Paremeter3:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.AWS_S3_EU_BUCKET
+        Value: 'invoice-extraction-eu'
+        Tier: Standard
+        Type: String
+  Paremeter4:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.ENVIRONMENT
+        Value: 'development'
+        Tier: Standard
+        Type: String
+  Paremeter5:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.CUSTOMER_DATA_DIR
+        Value: 'data/app/customers'
+        Tier: Standard
+        Type: String
+  Paremeter6:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.DEV_PORT
+        Value: '8080'
+        Tier: Standard
+        Type: String
+  Paremeter7:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR
+      SecretString: 
+        '1111111111'
+  Paremeter8:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.LOG_LEVEL
+        Value: 'WARNING'
+        Tier: Standard
+        Type: String
+  Paremeter9:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_INVOICE
+       SecretString: 
+        '6e8cdf75c7360632'
+  Paremeter10:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.DEBUG
+        Value: 'FALSE'
+        Tier: Standard
+        Type: String
+  Paremeter11:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.AWS_S3_US_BUCKET
+        Value: 'invoice-extraction-us'
+        Tier: Standard
+        Type: String
+  Paremeter12:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR
+       SecretString: 
+        '1111111111'
+  Paremeter13:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_PROJECTID
+        Value: 'invoice-data-evaluation-wrong'
+        Tier: Standard
+        Type: String
+  Paremeter14:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.API_KEY_NAME
+        Value: 'access_token'
+        Tier: Standard
+        Type: String
+  Paremeter15:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.API_KEY_USER
+       SecretString: 
+        'e95f022b640705164d576060de5af3b9'
+  Paremeter16:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_SPLITTER
+       SecretString: 
+        '8fb5bffcee6f8d61'
+  Paremeter17:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.AZURE_FORM_ENDPOINT
+        Value: 'https://bilformrecognizer.cognitiveservices.azure.com/'
+        Tier: Standard
+        Type: String
+  Paremeter18:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.BILLTO_MODEL
+        Value: 's3://invoice-extraction-us/app/models/dev/billto_model.latest.pkl'
+        Tier: Standard
+        Type: String
+  Paremeter19:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.API_KEY
+       SecretString: 
+        'e95f022b640705164d576060de5af3b9'
+  Paremeter20:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_US_BUCKET
+        Value: 'us-invoice-data'
+        Tier: Standard
+        Type: String
+  Paremeter21:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.AZURE_KEY
+       SecretString: 
+        '952a805fbd2b4c4882563c2a82bcbd16'
+  Paremeter22:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_EU_BUCKET
+        Value: 'eu-invoice-data'
+        Tier: Standard
+        Type: String
+  Paremeter23:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.PDFTOTEXT_BIN_PATH
+        Value: '/usr/bin/pdftotext'
+        Tier: Standard
+        Type: String
+  Paremeter24:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.TEST_DIR
+        Value: '/tests'
+        Tier: Standard
+        Type: String
+  Paremeter25:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.DB_CONN
+        Value: 'mysql+pymysql://invoiceai:57NYhqD9rcgEr2J4@bil-microservices-aurora-invoice-demo.cxn8scf5rkio.eu-west-1.rds.amazonaws.com:3306/invoiceai_dev?ssl=true'
+        Tier: Standard
+        Type: String
+  Paremeter26:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_TOKENPATH
+        Value: '/config/invoice-data-evaluation.json.wrong'
+        Tier: Standard
+        Type: String
+  Paremeter27:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.API_KEY_ADMIN
+       SecretString: 
+        'f4ccaf6c17019fb67b5cd66b0502deb1'
+  Paremeter28:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.AWS_SECRET_ACCESS_KEY
+       SecretString: 
+        '5WwShT6ec6S2cKDdgizVoQD7prqF9dhew6AGf4sK'
+  Paremeter29:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.CORE_LINEITEMS_EXTRACTION
+        Value: 'False'
+        Tier: Standard
+        Type: String
+  Paremeter30:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.AWS_ACCESS_KEY_ID
+       SecretString: 
+        'AKIA4VVILGA4PHGYBTJ2'
+  Paremeter31:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.DATA_DIR
+        Value: '/app/data/'
+        Tier: Standard
+        Type: String
+  Paremeter32:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.RELOAD
+        Value: 'FALSE'
+        Tier: Standard
+        Type: String
+  Paremeter33:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.ACCESS_LOG
+        Value: 'FALSE'
+        Tier: Standard
+        Type: String
+  Paremeter34:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_INVOIC
+       SecretString: 
+        '6d9b82da888720e4'
+  Paremeter35:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.PATH_PREFIX
+        Value: '/extract/v1'
+        Tier: Standard
+        Type: String
+  Paremeter36:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: String
+      Name: DEV.DEMO-INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_UTILITY
+       SecretString: 
+        'a5975d80886adc2b'
+  Paremeter37:
+    Type: AWS::SSM::Parameter
+    Properties: 
+        DataType: text
+        Name: DEV.DEMO-INVOICE_EXTRACTION.AZURE_ENDPOINT
+        Value: 'https://bilocr.cognitiveservices.azure.com/vision/v3.2/read/analyze'
+        Tier: Standard
+        Type: String

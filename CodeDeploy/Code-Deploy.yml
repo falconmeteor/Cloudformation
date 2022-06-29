@@ -1,0 +1,13 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  AppECSBilMicroservicesTestInvoiceExtractionAppDemo:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: AppECS-bil-microservices-test-invoice_extraction_app-demo
+      ComputePlatform: ECS
+      # Tags: 
+      #   - Tag
+
+

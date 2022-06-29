@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL CODE BUILD UNITTEST IAM 
+Resources:
+#Policy1
+  PRODUNITTESTIAMPOLICY:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'AWS ECS AUTOSCALING POLICY'
+      ManagedPolicyName: CodeBuildBasePolicy-unittest-prod-invoice_extraction_app-eu-west-1-demo
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            Resource: 
+            - "arn:aws:logs:eu-west-1:871157674040:log-group:/aws/codebuild/unittest-prod-invoice_extraction_app-demo"
+            - "arn:aws:logs:eu-west-1:871157674040:log-group:/aws/codebuild/unittest-prod-invoice_extraction_app-demo:*"
+          - Effect: Allow
+            Action: 
+            - "s3:PutObject"
+            - "s3:GetObject"
+            - "s3:GetObjectVersion"
+            - "s3:GetBucketAcl"
+            - "s3:GetBucketLocation"
+            Resource: 
+            - "arn:aws:s3:::codepipeline-eu-west-1-*"
+          - Effect: Allow
+            Action: 
+            - "s3:PutObject"
+            - "s3:GetBucketAcl"
+            - "s3:GetBucketLocation"
+            Resource: 
+            - "arn:aws:s3:::codepipeline-eu-west-1-746302643285"
+            - "arn:aws:s3:::codepipeline-eu-west-1-746302643285/*"
+          - Effect: Allow
+            Action: 
+            - "codebuild:CreateReportGroup"
+            - "codebuild:CreateReport"
+            - "codebuild:UpdateReport"
+            - "codebuild:BatchPutTestCases"
+            - "codebuild:BatchPutCodeCoverages"
+            Resource: 
+            - "arn:aws:codebuild:eu-west-1:871157674040:report-group/unittest-prod-invoice_extraction_app-demo*"
+#Policy 2
+  PRODUNITTESTIAMPOLICY2:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'CodeBuild VPC Policy UNITTEST PROD'
+      ManagedPolicyName: CodeBuildVpcPolicy-unittest-prod-invoice_extraction_app-eu-west-1-demo
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - ec2:CreateNetworkInterface
+          - ec2:DescribeDhcpOptions
+          - ec2:DescribeNetworkInterfaces
+          - ec2:DeleteNetworkInterface
+          - ec2:DescribeSubnets
+          - ec2:DescribeSecurityGroups
+          - ec2:DescribeVpcs
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - ec2:CreateNetworkInterfacePermission
+          Resource: arn:aws:ec2:eu-west-1:871157674040:network-interface/*
+          Condition:
+            StringEquals:
+              ec2:Subnet:
+              - arn:aws:ec2:eu-west-1:871157674040:subnet/subnet-0e87cfbd496675012
+              - arn:aws:ec2:eu-west-1:871157674040:subnet/subnet-05677243c8da07bf5
+              ec2:AuthorizedService: codebuild.amazonaws.com
+#Policy 3
+  PRODUNITTESTIAMPOLICY2:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'SSM PROD INVOICE EXTRACTION'
+      ManagedPolicyName: "SSM-PROD.INVOICE_EXTRACTION-demo"
+      PolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Sid: VisualEditor0
+          Effect: Allow
+          Action: ssm:DescribeParameters
+          Resource: "*"
+        - Sid: VisualEditor1
+          Effect: Allow
+          Action: ssm:GetParameters
+          Resource: "arn:aws:ssm:eu-west-1:871157674040:parameter/PROD.INVOICE_EXTRACTION*"
+
+#ECS AUTOSCALING ROLE
+  ECSAUTOSCALEROLE:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: bil-codebuild-unittest-invoice-prod-role
+      ManagedPolicyArns: 
+        - !Ref PRODUNITTESTIAMPOLICY1
+        - !Ref PRODUNITTESTIAMPOLICY2
+        - !Ref PRODUNITTESTIAMPOLICY3
+      RoleName: codebuild-unittest-prod-invoice_extraction_app-service-role-demo
+
+

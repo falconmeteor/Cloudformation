@@ -1,0 +1,51 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL ECR Repository
+Parameters:
+    RepositoryName:
+        Description: Enter comma-delimited list for Repository Names
+        Type: CommaDelimitedList
+        Default: "dev-invoice_extraction_app-demo, test-invoice_extraction_app-demo, prod-invoice_extraction_app-demo"
+Resources:
+  ECR1:
+    Type: AWS::ECR::Repository
+    Properties: 
+      # EncryptionConfiguration: 
+      #   EncryptionConfiguration
+      # ImageScanningConfiguration: 
+      #   ImageScanningConfiguration
+      ImageTagMutability: MUTABLE
+      # LifecyclePolicy: 
+      #   LifecyclePolicy
+      RepositoryName: !Select [0, !Ref RepositoryName ]
+      # RepositoryPolicyText: Json
+      # Tags: 
+      #   - Tag
+  ECR2:
+    Type: AWS::ECR::Repository
+    Properties: 
+      # EncryptionConfiguration: 
+      #   EncryptionConfiguration
+      # ImageScanningConfiguration: 
+      #   ImageScanningConfiguration
+      ImageTagMutability: MUTABLE
+      # LifecyclePolicy: 
+      #   LifecyclePolicy
+      RepositoryName: !Select [1, !Ref RepositoryName ]
+      # RepositoryPolicyText: Json
+      # Tags: 
+      #   - Tag
+  ECR3:
+    Type: AWS::ECR::Repository
+    Properties: 
+      # EncryptionConfiguration: 
+      #   EncryptionConfiguration
+      # ImageScanningConfiguration: 
+      #   ImageScanningConfiguration
+      ImageTagMutability: MUTABLE
+      # LifecyclePolicy: 
+      #   LifecyclePolicy
+      RepositoryName: !Select [2, !Ref RepositoryName ]
+      # RepositoryPolicyText: Json
+      # Tags: 
+      #   - Tag

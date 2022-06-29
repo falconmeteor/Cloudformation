@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL PROD CODEDEPLOYCloudformation
+Resources:
+  AppECSBilMicroservicesDevInvoiceExtractionAppDemo:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: AppECS-bil-microservices-prod-invoice_extraction_app-demo
+      ComputePlatform: ECS
+  DgpECSBilMicroservicesProdInvoiceExtractionAppDemo:
+      Type: AWS::CodeDeploy::DeploymentGroup
+      Properties: 
+        # AlarmConfiguration: 
+        #   AlarmConfiguration
+        ApplicationName: AppECS-bil-microservices-prod-invoice_extraction_app-demo
+        AutoRollbackConfiguration: 
+          Enabled: true
+          Events:
+          - DEPLOYMENT_STOP_ON_REQUEST
+          - DEPLOYMENT_FAILURE
+        BlueGreenDeploymentConfiguration:
+          DeploymentReadyOption:
+            ActionOnTimeout: CONTINUE_DEPLOYMENT
+            WaitTimeInMinutes: 0
+          TerminateBlueInstancesOnDeploymentSuccess:
+            Action: TERMINATE
+            TerminationWaitTimeInMinutes: 60
+        DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+        DeploymentGroupName: DgpECS-bil-microservices-prod-invoice_extraction_app-demo
+        DeploymentStyle: 
+          DeploymentOption: WITH_TRAFFIC_CONTROL
+          DeploymentType: BLUE_GREEN
+        ECSServices: 
+        - ClusterName: bil-microservices-demo
+          ServiceName: prod-invoice_extraction_app-demo
+        LoadBalancerInfo: 
+          TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+              - arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/da871158a9f4012d
+            TargetGroups:
+            - Name: bms-invoice-extraction-prod-tg-3
+            - Name: bms-invoice-extraction-prod-tg-4
+            TestTrafficRoute:
+              ListenerArns:
+              - arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/2a7d2b807ab6dbe4
+        OutdatedInstancesStrategy: UPDATE
+        ServiceRoleArn: arn:aws:iam::871157674040:role/CodeDeployServiceRole
+        # Tags: 
+        #   - Tag
+        # TriggerConfigurations: 
+        #   - TriggerConfig

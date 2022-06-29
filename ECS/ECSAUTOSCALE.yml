@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL ECS Repository
+Resources:
+#ECS SCALING TARGET
+  ECSSCALINGTARGET:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties: 
+      MaxCapacity: 10
+      MinCapacity: 2
+      ResourceId: service/bil-microservices-demo/dev-invoice_extraction_app-demo-demo
+      RoleARN: !GetAtt ECSAUTOSCALEROLE.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      # ScheduledActions: 
+      #   - ScheduledAction
+      ServiceNamespace: ecs
+      # SuspendedState: 
+      #   SuspendedState
+#ECS CPU SCALING POLICY
+  ECSSCALINGPOLICY1:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      PolicyName: invoice-ai-service-cpu-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      # ResourceId: service/bil-microservices-demo/dev-invoice_extraction_app-demo-demo
+      # ScalableDimension: ecs:service:DesiredCount
+      ScalingTargetId: !Ref ECSSCALINGTARGET
+      # ServiceNamespace: ecs
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: 75.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+#ECS MEMORY SCALING POLICY
+  ECSSCALINGPOLICY2:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      PolicyName: invoice-ai-service-memory-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      # ResourceId: service/bil-microservices-demo/dev-invoice_extraction_app-demo-demo
+      # ScalableDimension: ecs:service:DesiredCount
+      ScalingTargetId: !Ref ECSSCALINGTARGET
+      # ServiceNamespace: ecs
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: 75.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+#ECS AUTOSCALING POLICY 
+  ECSAUTOSCALEIAMPOLICY:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: 'AWS ECS AUTOSCALING POLICY'
+      ManagedPolicyName: BIL-ECS-AUTOSCALING-POLICY
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 
+            - "application-autoscaling:*"
+            - "ecs:DescribeServices"
+            - "ecs:UpdateService"
+            - "cloudwatch:DescribeAlarms"
+            - "cloudwatch:PutMetricAlarm"
+            - "cloudwatch:DeleteAlarms"
+            - "cloudwatch:DescribeAlarmHistory"
+            - "cloudwatch:DescribeAlarmsForMetric"
+            - "cloudwatch:GetMetricStatistics"
+            - "cloudwatch:ListMetrics"
+            - "cloudwatch:DisableAlarmActions"
+            - "cloudwatch:EnableAlarmActions"
+            - "iam:CreateServiceLinkedRole"
+            - "sns:CreateTopic"
+            - "sns:Subscribe"
+            - "sns:Get*"
+            - "sns:List*"
+            Resource: '*'
+#ECS AUTOSCALING ROLE
+  ECSAUTOSCALEROLE:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: bil-ecs-autoscaling-role
+      ManagedPolicyArns: 
+        - !Ref ECSAUTOSCALEIAMPOLICY
+      RoleName: BIL-ECS-AUTOSCALING-ROLE
+
+

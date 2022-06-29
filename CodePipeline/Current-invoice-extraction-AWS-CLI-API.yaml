@@ -1,0 +1,87 @@
+metadata:
+  created: '2021-02-09T15:03:45.412000-05:00'
+  pipelineArn: arn:aws:codepipeline:eu-west-1:871157674040:dev-invoice_extraction_app
+  updated: '2021-05-19T16:00:28.383000-04:00'
+pipeline:
+  artifactStore:
+    location: codepipeline-eu-west-1-746302643285
+    type: S3
+  name: dev-invoice_extraction_app
+  roleArn: arn:aws:iam::871157674040:role/service-role/AWSCodePipelineServiceRole-eu-west-1-dev-invoice_extraction_app
+  stages:
+  - actions:
+    - actionTypeId:
+        category: Source
+        owner: AWS
+        provider: CodeCommit
+        version: '1'
+      configuration:
+        BranchName: develop
+        OutputArtifactFormat: CODE_ZIP
+        PollForSourceChanges: 'false'
+        RepositoryName: invoice_extraction
+      inputArtifacts: []
+      name: Source
+      namespace: SourceVariables
+      outputArtifacts:
+      - name: SourceArtifact
+      region: eu-west-1
+      runOrder: 1
+    name: Source
+  - actions:
+    - actionTypeId:
+        category: Build
+        owner: AWS
+        provider: CodeBuild
+        version: '1'
+      configuration:
+        ProjectName: dev-invoice_extraction_app
+      inputArtifacts:
+      - name: SourceArtifact
+      name: Build
+      namespace: BuildVariables
+      outputArtifacts:
+      - name: DefinitionArtifact
+      - name: ImageArtifact
+      region: eu-west-1
+      runOrder: 1
+    name: Build
+  - actions:
+    - actionTypeId:
+        category: Test
+        owner: AWS
+        provider: CodeBuild
+        version: '1'
+      configuration:
+        ProjectName: unittest-dev-invoice_extraction_app
+      inputArtifacts:
+      - name: SourceArtifact
+      name: Test
+      outputArtifacts: []
+      region: eu-west-1
+      runOrder: 1
+    name: Test
+  - actions:
+    - actionTypeId:
+        category: Deploy
+        owner: AWS
+        provider: CodeDeployToECS
+        version: '1'
+      configuration:
+        AppSpecTemplateArtifact: DefinitionArtifact
+        AppSpecTemplatePath: appspec.yml
+        ApplicationName: AppECS-bil-microservices-dev-invoice_extraction_app
+        DeploymentGroupName: DgpECS-bil-microservices-dev-invoice_extraction_app
+        Image1ArtifactName: ImageArtifact
+        Image1ContainerName: IMAGE1_NAME
+        TaskDefinitionTemplateArtifact: DefinitionArtifact
+        TaskDefinitionTemplatePath: taskdef.json
+      inputArtifacts:
+      - name: DefinitionArtifact
+      - name: ImageArtifact
+      name: Deploy
+      outputArtifacts: []
+      region: eu-west-1
+      runOrder: 1
+    name: Deploy
+  version: 17

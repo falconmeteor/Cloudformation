@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  EFSDEMO:
+    Type: AWS::EFS::FileSystem
+    Properties: 
+      BackupPolicy: 
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags: 
+      - Key: Name
+        Value: 'invoice_data_extraction-demo'
+      KmsKeyId: !GetAtt
+        - key
+        - Arn 
+      LifecyclePolicies: 
+      - TransitionToIA: AFTER_30_DAYS
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-05677243c8da07bf5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-0cee8c1d17cecfce5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  key:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - 'kms:*'
+            Resource: 
+              - '*'
+ 
+  EC2EFS:
+    Type: AWS::EC2::Instance
+    DependsOn: [MountTargetResource1, MountTargetResource2]
+    Properties: 
+      AvailabilityZone: eu-west-1a
+      BlockDeviceMappings: 
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+      EbsOptimized: false
+      ImageId: ami-0c1bc246476a5572b
+      InstanceType: t2.micro
+      KeyName: bil-demo
+      PrivateDnsNameOptions: 
+        EnableResourceNameDnsAAAARecord: false
+        EnableResourceNameDnsARecord: true
+        HostnameType: ip-name
+      SecurityGroupIds: 
+        - sg-0da6e753474f5870d
+        - sg-082e50a6833277151
+      SourceDestCheck: true
+      SubnetId: subnet-05677243c8da07bf5
+      Tags: 
+      - Key: Name
+        Value: EFS-EC2-Demo-demo
+      Tenancy: default
+      UserData:
+        Fn::Base64: 
+          !Sub |
+              #!/bin/bash -xe
+              sudo mkdir /efs
+              sudo yum install -y amazon-efs-utils
+              sudo mount -t efs -o tls ${EFSDEMO.FileSystemId}:/ /efs
+              sudo mkdir -p /efs/dev/app/data
+              sudo mkdir -p /efs/dev/models
+              sudo mkdir -p /efs/dev/config
+
+    # aws ec2 describe-instances --instance-ids i-0aca0ecdeeb98ed5c
+    # aws efs describe-file-systems --file-system-id fs-0817568662bb9d1c7

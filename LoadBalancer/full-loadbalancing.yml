@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  ECSTARGETGROUP1DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-3
+      Targets:
+      - Id: i-0f5d32d6d313b2784
+        Port: 80
+      - Id: i-0b15ea0c556e05b31
+        Port: 80
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: vpc-047fce4aba1e80567
+  ECSTARGETGROUP2DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-4
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: vpc-047fce4aba1e80567
+
+  Listener1:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+          - ForwardConfig:
+              TargetGroupStickinessConfig:
+                Enabled: false
+              TargetGroups:
+                - TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+                  Weight: 1
+            Order: 1
+            TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+            Type: forward
+        LoadBalancerArn: !Ref ALB
+        Port: 8015
+        Protocol: HTTP
+
+# aws elbv2 describe-listeners --listener-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/a22e6350b245b422
+  Listeners:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroupStickinessConfig:
+              Enabled: false
+            TargetGroups:
+              - TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+                Weight: 1
+          Order: 1
+          TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+          Type: forward
+      LoadBalancerArn: !Ref ALB
+      Port: 8016
+      Protocol: HTTP
+
+  ALB:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        IpAddressType: ipv4
+        LoadBalancerAttributes: 
+        - Key: access_logs.s3.enabled
+          Value: 'true'
+        - Key: access_logs.s3.bucket
+          Value: bil-loadbalancer-logs
+        - Key: idle_timeout.timeout_seconds
+          Value: '1320'
+        - Key: deletion_protection.enabled
+          Value: 'false'
+        - Key: routing.http2.enabled
+          Value: 'true'
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'false'
+        - Key: routing.http.xff_client_port.enabled
+          Value: 'false'
+        - Key: routing.http.desync_mitigation_mode
+          Value: defensive
+        - Key: waf.fail_open.enabled
+          Value: 'false'
+        - Key: routing.http.x_amzn_tls_version_and_cipher_suite.enabled
+          Value: 'false'
+        Name: bil-microservices-elb-01-demo
+        Scheme: internet-facing
+        SecurityGroups: 
+          - sg-012c31dbd3d1f9c6b
+        Subnets: 
+          - subnet-059d49d62da5ac1cf
+          - subnet-0cee8c1d17cecfce5
+        Type: application
+
+#aws elbv2 describe-load-balancer-attributes --load-balancer-arn arn:aws:elasticloadbalancing:eu-west-1:871157674040:loadbalancer/app/bil-microservices-elb-01/7c56c7ed89b1d129

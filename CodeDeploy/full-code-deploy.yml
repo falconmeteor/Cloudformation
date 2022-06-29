@@ -1,0 +1,840 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Parameters:
+  Cluster:
+    Description: Please provide the ECS Cluster ID that this service should run on
+    Type: String
+    Default: bil-microservices-demo
+
+  EcsService:
+    Description: Please provide the ECSService ID that this service should run on
+    Type: String
+    Default: dev-invoice_extraction_app-demo
+
+  RepositoryName:
+      Description: Enter comma-delimited list for Repository Names
+      Type: CommaDelimitedList
+      Default: "dev-invoice_extraction_app-demo, test-invoice_extraction_app-demo, prod-invoice_extraction_app-demo"
+  EcsAmiId:
+    Type: String
+    Description: Specifies the AMI ID for your container instances.
+    Default: ami-07952635e5a4cdaf1
+  EcsInstanceType:
+    Type: CommaDelimitedList
+    Description: >
+      Specifies the EC2 instance type for your container instances.
+      Defaults to m4.large
+    Default: m5n.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Type: String
+    Description: >
+      Optional - Specifies the name of an existing Amazon EC2 key pair
+      to enable SSH access to the EC2 instances in your cluster.
+    Default: 'bil-demo'
+  VpcId:
+    Type: String
+    Description: >
+      Optional - Specifies the ID of an existing VPC in which to launch
+      your container instances. If you specify a VPC ID, you must specify a list of
+      existing subnets in that VPC. If you do not specify a VPC ID, a new VPC is created
+      with atleast 1 subnet.
+    Default: 'vpc-047fce4aba1e80567'
+    ConstraintDescription: >
+      VPC Id must begin with 'vpc-' or leave blank to have a
+      new VPC created
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: >
+      Optional - Specifies the Comma separated list of existing VPC Subnet
+      Ids where ECS instances will run
+    Default: 'subnet-05677243c8da07bf5, subnet-0e87cfbd496675012'
+  SecurityGroupId:
+    Type: String
+    Description: >
+      Optional - Specifies the Security Group Id of an existing Security
+      Group. Leave blank to have a new Security Group created
+    Default: 'sg-09d40f93776324bef'
+  VpcCidr:
+    Type: String
+    Description: Optional - Specifies the CIDR Block of VPC
+    Default: '10.0.0.0/16'
+  SubnetCidr1:
+    Type: String
+    Description: Specifies the CIDR Block of Subnet 1
+    Default: 10.0.0.0/24''
+  SubnetCidr2:
+    Type: String
+    Description: Specifies the CIDR Block of Subnet 2
+    Default: '10.0.1.0/24'
+  SubnetCidr3:
+    Type: String
+    Description: Specifies the CIDR Block of Subnet 3
+    Default: ''
+  AsgMaxSize:
+    Type: Number
+    Description: >
+      Specifies the number of instances to launch and register to the cluster.
+      Defaults to 1.
+    Default: '3'
+  IamRoleInstanceProfile:
+    Type: String
+    Description: >
+      Specifies the Name or the Amazon Resource Name (ARN) of the instance
+      profile associated with the IAM role for the instance
+    Default: '	arn:aws:iam::871157674040:instance-profile/ecsInstanceRole'
+  SecurityIngressFromPort:
+    Type: Number
+    Description: >
+      Optional - Specifies the Start of Security Group port to open on
+      ECS instances - defaults to port 0
+    Default: '0'
+  SecurityIngressToPort:
+    Type: Number
+    Description: >
+      Optional - Specifies the End of Security Group port to open on ECS
+      instances - defaults to port 65535
+    Default: '65535'
+  SecurityIngressCidrIp:
+    Type: String
+    Description: >
+      Optional - Specifies the CIDR/IP range for Security Ports - defaults
+      to 0.0.0.0/0
+    Default: 0.0.0.0/0
+  EcsEndpoint:
+    Type: String
+    Description: >
+      Optional - Specifies the ECS Endpoint for the ECS Agent to connect to
+    Default: ''
+  VpcAvailabilityZones:
+    Type: CommaDelimitedList
+    Description: >
+      Specifies a comma-separated list of 3 VPC Availability Zones for
+      the creation of new subnets. These zones must have the available status.
+    Default: 'eu-west-1a,eu-west-1b,eu-west-1c'
+  RootEbsVolumeSize:
+    Type: Number
+    Description: >
+      Optional - Specifies the Size in GBs of the root EBS volume
+    Default: 30
+  EbsVolumeSize:
+    Type: Number
+    Description: >
+      Optional - Specifies the Size in GBs of the data storage EBS volume used by the Docker in the AL1 ECS-optimized AMI
+    Default: 22
+  EbsVolumeType:
+    Type: String
+    Description: Optional - Specifies the Type of (Amazon EBS) volume
+    Default: 'gp2'
+    AllowedValues:
+      - ''
+      - standard
+      - io1
+      - gp2
+      - sc1
+      - st1
+    ConstraintDescription: Must be a valid EC2 volume type.
+  RootDeviceName:
+    Type: String
+    Description: Optional - Specifies the device mapping for the root EBS volume.
+    Default: /dev/xvda
+  DeviceName:
+    Type: String
+    Description: Optional - Specifies the device mapping for the EBS volume used for data storage. Only applicable to AL1.
+    Default: '/dev/xvdcz'
+  UseSpot:
+    Type: String
+    Default: 'false'
+  IamSpotFleetRoleArn:
+    Type: String
+    Default: ''
+  SpotPrice:
+    Type: String
+    Default: ''
+  SpotAllocationStrategy:
+    Type: String
+    Default: 'diversified'
+    AllowedValues:
+      - 'lowestPrice'
+      - 'diversified'
+
+  IsWindows:
+    Type: String
+    Default: 'false'
+  ConfigureRootVolume:
+    Type: String
+    Description: Optional - Specifies if there should be customization of the root volume
+    Default: 'false'
+  ConfigureDataVolume:
+    Type: String
+    Description: Optional - Specifies if there should be customization of the data volume
+    Default: 'true'
+  AutoAssignPublicIp:
+    Type: String
+    Default: 'INHERIT'
+
+
+
+Conditions:
+  CreateEC2LCWithKeyPair:
+    !Not [!Equals [!Ref KeyName, '']]
+  SetEndpointToECSAgent:
+    !Not [!Equals [!Ref EcsEndpoint, '']]
+  CreateNewSecurityGroup:
+    !Equals [!Ref SecurityGroupId, '']
+  CreateNewVpc:
+    !Equals [!Ref VpcId, '']
+  CreateSubnet1: !And
+    - !Not [!Equals [!Ref SubnetCidr1, '']]
+    - !Condition CreateNewVpc
+  CreateSubnet2: !And
+    - !Not [!Equals [!Ref SubnetCidr2, '']]
+    - !Condition CreateSubnet1
+  CreateSubnet3: !And
+    - !Not [!Equals [!Ref SubnetCidr3, '']]
+    - !Condition CreateSubnet2
+  CreateWithSpot: !Equals [!Ref UseSpot, 'true']
+  CreateWithASG: !Not [!Condition CreateWithSpot]
+  CreateWithSpotPrice: !Not [!Equals [!Ref SpotPrice, '']]
+  IsConfiguringRootVolume: !Equals [!Ref ConfigureRootVolume, 'true']
+  IsConfiguringDataVolume: !Equals [!Ref ConfigureDataVolume, 'true']
+  IsInheritPublicIp: !Equals [!Ref AutoAssignPublicIp, 'INHERIT']
+
+
+
+
+
+
+Resources:
+  Vpc:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  PubSubnetAz1:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr1
+      AvailabilityZone: !Select [ 0, !Ref VpcAvailabilityZones ]
+      MapPublicIpOnLaunch: true
+  PubSubnetAz2:
+    Condition: CreateSubnet2
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr2
+      AvailabilityZone: !Select [ 1, !Ref VpcAvailabilityZones ]
+      MapPublicIpOnLaunch: true
+  PubSubnetAz3:
+    Condition: CreateSubnet3
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr3
+      AvailabilityZone: !Select [ 2, !Ref VpcAvailabilityZones ]
+      MapPublicIpOnLaunch: true
+  InternetGateway:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::InternetGateway
+  AttachGateway:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+  RouteViaIgw:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+  PublicRouteViaIgw:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteViaIgw
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PubSubnet1RouteTableAssociation:
+    Condition: CreateSubnet1
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSubnetAz1
+      RouteTableId: !Ref RouteViaIgw
+  PubSubnet2RouteTableAssociation:
+    Condition: CreateSubnet2
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSubnetAz2
+      RouteTableId: !Ref RouteViaIgw
+  PubSubnet3RouteTableAssociation:
+    Condition: CreateSubnet3
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSubnetAz3
+      RouteTableId: !Ref RouteViaIgw
+  EcsSecurityGroup:
+    Condition: CreateNewSecurityGroup
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS Allowed Ports
+      VpcId: !If [ CreateSubnet1, !Ref Vpc, !Ref VpcId ]
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        FromPort: !Ref SecurityIngressFromPort
+        ToPort: !Ref SecurityIngressToPort
+        CidrIp: !Ref SecurityIngressCidrIp
+  rEcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties: 
+      ClusterName: !Ref Cluster
+      ClusterSettings: 
+        - Name: containerInsights
+          Value: enabled
+  EcsInstanceLc:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Condition: CreateWithASG
+    Properties:
+      ImageId: !Ref EcsAmiId
+      InstanceType: !Select [ 0, !Ref EcsInstanceType ]
+      AssociatePublicIpAddress: !If [ IsInheritPublicIp, !Ref "AWS::NoValue", !Ref AutoAssignPublicIp ]
+      IamInstanceProfile: !Ref IamRoleInstanceProfile
+      KeyName: !If [ CreateEC2LCWithKeyPair, !Ref KeyName, !Ref "AWS::NoValue" ]
+      SecurityGroups: [ !If [ CreateNewSecurityGroup, !Ref EcsSecurityGroup, !Ref SecurityGroupId ] ]
+      BlockDeviceMappings:
+        - !If
+          - IsConfiguringRootVolume
+          - DeviceName: !Ref RootDeviceName
+            Ebs:
+              VolumeSize: !Ref RootEbsVolumeSize
+              VolumeType: !Ref EbsVolumeType
+          - !Ref AWS::NoValue
+        - !If
+          - IsConfiguringDataVolume
+          - DeviceName: !Ref DeviceName
+            Ebs:
+              VolumeSize: !Ref EbsVolumeSize
+              VolumeType: !Ref EbsVolumeType
+          - !Ref AWS::NoValue
+      UserData:
+        Fn::Base64: 
+          !Sub |
+              #!/bin/bash -xe
+              sudo echo "ECS_CLUSTER=bil-microservices-demo" >> /etc/ecs/ecs.config
+  EcsInstanceAsg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: CreateWithASG
+    Properties:
+      VPCZoneIdentifier: !If
+        - CreateSubnet1
+        - !If
+          - CreateSubnet2
+          - !If
+            - CreateSubnet3
+            - [ !Sub "${PubSubnetAz1}, ${PubSubnetAz2}, ${PubSubnetAz3}" ]
+            - [ !Sub "${PubSubnetAz1}, ${PubSubnetAz2}" ]
+          - [ !Sub "${PubSubnetAz1}" ]
+        - !Ref SubnetIds
+      LaunchConfigurationName: !Ref EcsInstanceLc
+      MinSize: '3'
+      MaxSize: !Ref AsgMaxSize
+      DesiredCapacity: !Ref AsgMaxSize
+      Tags:
+        -
+          Key: Name
+          Value: !Sub "ECS Instance - ${AWS::StackName}"
+          PropagateAtLaunch: true
+        -
+          Key: Description
+          Value: "This instance is the part of the Auto Scaling group which was created through ECS Console"
+          PropagateAtLaunch: true
+    DependsOn: rEcsCluster
+  EcsSpotFleet:
+    Condition: CreateWithSpot
+    Type: AWS::EC2::SpotFleet
+    Properties:
+      SpotFleetRequestConfigData:
+        AllocationStrategy: !Ref SpotAllocationStrategy
+        IamFleetRole: !Ref IamSpotFleetRoleArn
+        TargetCapacity: !Ref AsgMaxSize
+        SpotPrice: !If [ CreateWithSpotPrice, !Ref SpotPrice, !Ref 'AWS::NoValue' ]
+        TerminateInstancesWithExpiration: true
+        LaunchSpecifications: 
+            -
+              IamInstanceProfile:
+                Arn: !Ref IamRoleInstanceProfile
+              ImageId: !Ref EcsAmiId
+              InstanceType: !Select [ 0, !Ref EcsInstanceType ]
+              KeyName: !If [ CreateEC2LCWithKeyPair, !Ref KeyName, !Ref "AWS::NoValue" ]
+              Monitoring:
+                Enabled: true
+              SecurityGroups:
+                - GroupId: !If [ CreateNewSecurityGroup, !Ref EcsSecurityGroup, !Ref SecurityGroupId ]
+              SubnetId: !If
+                      - CreateSubnet1
+                      - !If
+                        - CreateSubnet2
+                        - !If
+                          - CreateSubnet3
+                          - !Join [ "," , [ !Ref PubSubnetAz1, !Ref PubSubnetAz2, !Ref PubSubnetAz3 ] ]
+                          - !Join [ "," , [ !Ref PubSubnetAz1, !Ref PubSubnetAz2 ] ]
+                        - !Ref PubSubnetAz1
+                      - !Join [ "," , !Ref SubnetIds ]
+              BlockDeviceMappings:
+                    - DeviceName: !Ref DeviceName
+                      Ebs:
+                       VolumeSize: !Ref EbsVolumeSize
+                       VolumeType: !Ref EbsVolumeType
+              UserData:
+                Fn::Base64: 
+                  !Sub |
+                      #!/bin/bash -xe
+                      sudo echo "ECS_CLUSTER=bil-microservices-demo" >> /etc/ecs/ecs.config
+
+
+  ECSTARGETGROUP1DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-3
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VpcId
+    DependsOn: ALB
+  ECSTARGETGROUP2DEVINVOICE:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health_check
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      Name: bms-invoice-extraction-dev-tg-4
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VpcId
+    DependsOn: ALB
+  Listener1:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+          - ForwardConfig:
+              TargetGroupStickinessConfig:
+                Enabled: false
+              TargetGroups:
+                - TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+                  Weight: 1
+            Order: 1
+            TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+            Type: forward
+        LoadBalancerArn: !Ref ALB
+        Port: 8015
+        Protocol: HTTP
+
+# aws elbv2 describe-listeners --listener-arns arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01/7c56c7ed89b1d129/a22e6350b245b422
+  Listener2:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroupStickinessConfig:
+              Enabled: false
+            TargetGroups:
+              - TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+                Weight: 1
+          Order: 1
+          TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+          Type: forward
+      LoadBalancerArn: !Ref ALB
+      Port: 8016
+      Protocol: HTTP
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes: 
+      - Key: access_logs.s3.enabled
+        Value: 'true'
+      - Key: access_logs.s3.bucket
+        Value: bil-loadbalancer-logs
+      - Key: idle_timeout.timeout_seconds
+        Value: '1320'
+      - Key: deletion_protection.enabled
+        Value: 'false'
+      - Key: routing.http2.enabled
+        Value: 'true'
+      - Key: routing.http.drop_invalid_header_fields.enabled
+        Value: 'false'
+      - Key: routing.http.xff_client_port.enabled
+        Value: 'false'
+      - Key: routing.http.desync_mitigation_mode
+        Value: defensive
+      - Key: waf.fail_open.enabled
+        Value: 'false'
+      - Key: routing.http.x_amzn_tls_version_and_cipher_suite.enabled
+        Value: 'false'
+      Name: bil-microservices-elb-01-demo
+      Scheme: internet-facing
+      SecurityGroups: 
+        - sg-012c31dbd3d1f9c6b
+      Subnets: 
+        - !Select [ 0, !Ref  SubnetIds ]
+        - !Select [ 1, !Ref  SubnetIds ]
+      Type: application
+    DependsOn: rEcsCluster
+
+
+  ECSServiceInvoiceExtractionAppDemo:
+    Type: AWS::ECS::Service
+    DependsOn: [DevInvoiceTaskDef, ECSTARGETGROUP1DEVINVOICE]
+    Properties: 
+      Cluster: !Ref rEcsCluster
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: CODE_DEPLOY
+      DesiredCount: 2
+      EnableECSManagedTags: true
+      EnableExecuteCommand: false  
+      LaunchType: EC2
+      LoadBalancers:
+      - ContainerName: app-demo
+        ContainerPort: 8080
+        TargetGroupArn: !Ref ECSTARGETGROUP1DEVINVOICE
+      PlacementStrategies:
+      - Field: attribute:ecs.availability-zone
+        Type: spread
+      - Field: instanceId
+        Type: spread
+      SchedulingStrategy: REPLICA
+      ServiceName: dev-invoice_extraction_app-demo-demo
+      TaskDefinition: !Ref DevInvoiceTaskDef
+
+  EFSDEMO:
+    Type: AWS::EFS::FileSystem
+    Properties: 
+      BackupPolicy: 
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags: 
+      - Key: Name
+        Value: 'invoice_data_extraction-demo-demo'
+      KmsKeyId: !GetAtt
+        - key
+        - Arn 
+      LifecyclePolicies: 
+      - TransitionToIA: AFTER_30_DAYS
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-05677243c8da07bf5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: EFSDEMO
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-0cee8c1d17cecfce5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  key:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - 'kms:*'
+            Resource: 
+              - '*'
+
+  EC2EFS:
+      Type: AWS::EC2::Instance
+      DependsOn: [MountTargetResource1, MountTargetResource2]
+      Properties: 
+        AvailabilityZone: eu-west-1a
+        BlockDeviceMappings: 
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+        EbsOptimized: false
+        ImageId: ami-0c1bc246476a5572b
+        InstanceType: t2.micro
+        KeyName: bil-demo
+        PrivateDnsNameOptions: 
+          EnableResourceNameDnsAAAARecord: false
+          EnableResourceNameDnsARecord: true
+          HostnameType: ip-name
+        SecurityGroupIds: 
+          - sg-0da6e753474f5870d
+          - sg-082e50a6833277151
+        SourceDestCheck: true
+        SubnetId: subnet-05677243c8da07bf5
+        Tags: 
+        - Key: Name
+          Value: EFS-EC2-Demo-demo
+        Tenancy: default
+        UserData:
+          Fn::Base64: 
+            !Sub |
+                #!/bin/bash -xe
+                sudo mkdir /efs
+                sudo yum install -y amazon-efs-utils
+                sudo mount -t efs -o tls ${EFSDEMO.FileSystemId}:/ /efs
+                sudo mkdir -p /efs/dev/app/data
+                sudo mkdir -p /efs/dev/models
+                sudo mkdir -p /efs/dev/config
+
+  DevInvoiceTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: [MountTargetResource1, MountTargetResource2, EC2EFS]
+    Properties:
+      ContainerDefinitions:
+      - Cpu: 0
+        Essential: true
+        Image: 871157674040.dkr.ecr.eu-west-1.amazonaws.com/dev-invoice_extraction_app:cc97453
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-create-group: 'true'
+            awslogs-group: /ecs/invoice_extraction_app-demo
+            awslogs-region: eu-west-1
+            awslogs-stream-prefix: /dev
+        MemoryReservation: 1024
+        MountPoints:
+        - ContainerPath: /app/data
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-data
+        - ContainerPath: /models
+          ReadOnly: false
+          SourceVolume: efs-invoice_extraction-models
+        - ContainerPath: /config
+          ReadOnly: true
+          SourceVolume: efs-invoice_extraction-config
+        Name: app-demo
+        PortMappings:
+        - ContainerPort: 8080
+          HostPort: 0
+          Protocol: tcp
+        Secrets:
+        - Name: ACCESS_LOG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.ACCESS_LOG
+        - Name: RELOAD
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.RELOAD
+        - Name: DEBUG
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DEBUG
+        - Name: DEV_PORT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DEV_PORT
+        - Name: ENVIRONMENT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.ENVIRONMENT
+        - Name: PATH_PREFIX
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.PATH_PREFIX
+        - Name: LOG_LEVEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.LOG_LEVEL
+        - Name: DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DATA_DIR
+        - Name: TEST_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.TEST_DIR
+        - Name: AWS_ACCESS_KEY_ID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_ACCESS_KEY_ID
+        - Name: AWS_SECRET_ACCESS_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_SECRET_ACCESS_KEY
+        - Name: AWS_S3_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_S3_US_BUCKET
+        - Name: AWS_S3_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AWS_S3_EU_BUCKET
+        - Name: CORE_LINEITEMS_EXTRACTION
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.CORE_LINEITEMS_EXTRACTION
+        - Name: GCDOCAI_TOKENPATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_TOKENPATH
+        - Name: GCDOCAI_PROJECTID
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_PROJECTID
+        - Name: GCDOCAI_US_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR
+        - Name: GCDOCAI_EU_PROCESSOR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR
+        - Name: GCDOCAI_US_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_BUCKET
+        - Name: GCDOCAI_EU_BUCKET
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_BUCKET
+        - Name: GCDOCAI_US_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_EU_PROCESSOR_SPLITTER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_SPLITTER
+        - Name: GCDOCAI_US_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_INVOICE
+        - Name: GCDOCAI_EU_PROCESSOR_INVOICE
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_EU_PROCESSOR_INVOICE
+        - Name: GCDOCAI_US_PROCESSOR_UTILITY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.GCDOCAI_US_PROCESSOR_UTILITY
+        - Name: AZURE_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_ENDPOINT
+        - Name: AZURE_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_KEY
+        - Name: AZURE_FORM_ENDPOINT
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_FORM_ENDPOINT
+        - Name: AZURE_FORM_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.AZURE_FORM_KEY
+        - Name: PDFTOTEXT_BIN_PATH
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.PDFTOTEXT_BIN_PATH
+        - Name: CUSTOMER_DATA_DIR
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.CUSTOMER_DATA_DIR
+        - Name: SUPPLIER_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.SUPPLIER_MODEL
+        - Name: BILLTO_MODEL
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.BILLTO_MODEL
+        - Name: DB_CONN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.DB_CONN
+        - Name: API_KEY_NAME
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_NAME
+        - Name: API_KEY
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY
+        - Name: API_KEY_USER
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_USER
+        - Name: API_KEY_ADMIN
+          ValueFrom: arn:aws:ssm:eu-west-1:871157674040:parameter/DEV.INVOICE_EXTRACTION.API_KEY_ADMIN
+        volumesFrom: []
+      ExecutionRoleArn: arn:aws:iam::871157674040:role/ecsTaskExecutionRole
+      Family: dev_invoice_extraction_app-demo
+      Volumes:
+      - Name: efs-invoice_extraction-data
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/app/data
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-models
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/models
+          TransitEncryption: ENABLED
+      - Name: efs-invoice_extraction-config
+        EfsVolumeConfiguration:
+          FileSystemId: !Ref EFSDEMO
+          RootDirectory: /dev/config
+          TransitEncryption: ENABLED
+
+
+
+
+
+  Appcodedeploy:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: AppECS-bil-microservices-test-invoice_extraction_app-demo-demo
+      ComputePlatform: ECS
+
+
+  DgpECSBilMicroservicesTestInvoiceExtractionAppDemo:
+      Type: AWS::CodeDeploy::DeploymentGroup
+      Properties: 
+        # AlarmConfiguration: 
+        #   AlarmConfiguration
+        ApplicationName: !Ref Appcodedeploy
+        AutoRollbackConfiguration: 
+          Enabled: true
+          Events:
+          - DEPLOYMENT_STOP_ON_REQUEST
+          - DEPLOYMENT_FAILURE
+        BlueGreenDeploymentConfiguration:
+          DeploymentReadyOption:
+            ActionOnTimeout: CONTINUE_DEPLOYMENT
+            WaitTimeInMinutes: 0
+          TerminateBlueInstancesOnDeploymentSuccess:
+            Action: TERMINATE
+            TerminationWaitTimeInMinutes: 60
+        DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+        DeploymentGroupName: DgpECS-bil-microservices-test-invoice_extraction_app-demo
+        DeploymentStyle: 
+          DeploymentOption: WITH_TRAFFIC_CONTROL
+          DeploymentType: BLUE_GREEN
+        ECSServices: 
+        - ClusterName: !Ref Cluster
+          ServiceName: !GetAtt ECSServiceInvoiceExtractionAppDemo.Name
+        LoadBalancerInfo: 
+          TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+              - !Ref Listener1
+            TargetGroups:
+            - Name: !Ref ECSTARGETGROUP1DEVINVOICE
+            - Name: !Ref ECSTARGETGROUP2DEVINVOICE
+            TestTrafficRoute:
+              ListenerArns:
+              - !Ref Listener2
+        OutdatedInstancesStrategy: UPDATE
+        ServiceRoleArn: arn:aws:iam::871157674040:role/CodeDeployServiceRole
+      DependsOn: ECSServiceInvoiceExtractionAppDemo
+
+  ECR1:
+    Type: AWS::ECR::Repository
+    Properties: 
+      ImageTagMutability: MUTABLE
+      RepositoryName: !Select [0, !Ref RepositoryName ]
+  ECR2:
+    Type: AWS::ECR::Repository
+    Properties:
+      ImageTagMutability: MUTABLE
+      RepositoryName: !Select [1, !Ref RepositoryName ]
+  ECR3:
+    Type: AWS::ECR::Repository
+    Properties: 
+      ImageTagMutability: MUTABLE
+      RepositoryName: !Select [2, !Ref RepositoryName ]
+
+Outputs:
+  EcsInstanceAsgName:
+    Condition: CreateWithASG
+    Description: Auto Scaling Group Name for ECS Instances
+    Value: !Ref EcsInstanceAsg
+  EcsSpotFleetRequestId:
+      Condition: CreateWithSpot
+      Description: Spot Fleet Request for ECS Instances
+      Value: !Ref EcsSpotFleet
+  UsedByECSCreateCluster:
+    Description: Flag used by ECS Create Cluster Wizard
+    Value: 'true'
+  TemplateVersion:
+    Description: The version of the template used by Create Cluster Wizard
+    Value: '2.0.0'

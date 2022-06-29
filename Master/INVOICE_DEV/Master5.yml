@@ -1,0 +1,419 @@
+Parameters:
+  EFSDEMO:
+    Description: Please provide the ECS Cluster ID that this service should run on
+    Type: String
+    Default: fs-0f57eaa89d64b2816
+  BranchName:
+    Description: CodeCommit branch name
+    Type: String
+    Default: develop
+  RepoName:
+    Description: CodeComit repository name
+    Type: String
+    Default: invoice_extraction-demo
+  Build1:
+    Description: CodeBuild Invoice Extraction
+    Type: String
+    Default: dev-invoice_extraction_app-demo
+  Build2:
+    Description: CodeBuild Unit Test
+    Type: String
+    Default: unittest-dev-invoice_extraction_app-demo
+  ApplicationName:
+    Description: CodeDeploy application name
+    Type: String
+    Default: AppECS-bil-microservices-test-invoice_extraction_app-demo
+  Fleet:
+    Description: Deployment group in CodeDeploy
+    Type: String
+    Default: DgpECS-bil-microservices-test-invoice_extraction_app-demo
+
+  Cluster:
+    Description: Please provide the ECS Cluster ID that this service should run on
+    Type: String
+    Default: bil-microservices-demo
+
+  EcsService:
+    Description: Please provide the ECSService ID that this service should run on
+    Type: String
+    Default: dev-invoice_extraction_app-demo
+
+  RepositoryName:
+      Description: Enter comma-delimited list for Repository Names
+      Type: CommaDelimitedList
+      Default: "dev-invoice_extraction_app-demo, test-invoice_extraction_app-demo, prod-invoice_extraction_app-demo"
+
+Resources:
+#CodeDeploy App
+  Appcodedeploy:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: AppECS-bil-microservices-dev-invoice_extraction_app-demo-demo
+      ComputePlatform: ECS
+#CodeDeploy Deployment Group
+  DgpECSBilMicroservicesDevInvoiceExtractionAppDemo:
+      Type: AWS::CodeDeploy::DeploymentGroup
+      DependsOn: Appcodedeploy
+      Properties: 
+        # AlarmConfiguration: 
+        #   AlarmConfiguration
+        ApplicationName: !Ref Appcodedeploy
+        AutoRollbackConfiguration: 
+          Enabled: true
+          Events:
+          - DEPLOYMENT_STOP_ON_REQUEST
+          - DEPLOYMENT_FAILURE
+        BlueGreenDeploymentConfiguration:
+          DeploymentReadyOption:
+            ActionOnTimeout: CONTINUE_DEPLOYMENT
+            WaitTimeInMinutes: 0
+          TerminateBlueInstancesOnDeploymentSuccess:
+            Action: TERMINATE
+            TerminationWaitTimeInMinutes: 60
+        DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+        DeploymentGroupName: DgpECS-bil-microservices-dev-invoice_extraction_app-demo
+        DeploymentStyle: 
+          DeploymentOption: WITH_TRAFFIC_CONTROL
+          DeploymentType: BLUE_GREEN
+        ECSServices: 
+        - ClusterName: !Ref Cluster
+          ServiceName: dev-invoice_extraction_app-demo-demo
+        LoadBalancerInfo: 
+          TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+              - arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01-demo/5abec5825ff92f9a/8b354e8339e3aadd
+            TargetGroups:
+            - Name: bms-invoice-extraction-dev-tg-3
+            - Name: bms-invoice-extraction-dev-tg-4
+            TestTrafficRoute:
+              ListenerArns:
+              - arn:aws:elasticloadbalancing:eu-west-1:871157674040:listener/app/bil-microservices-elb-01-demo/5abec5825ff92f9a/297f926e29cbc91b
+              # - !Ref Listener2
+        OutdatedInstancesStrategy: UPDATE
+        ServiceRoleArn: arn:aws:iam::871157674040:role/CodeDeployServiceRole
+      # DependsOn: ECSServiceInvoiceExtractionAppDemo
+
+
+#S3 Bucket 
+  CodePipelineArtifactStoreBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties: 
+      AccessControl: BucketOwnerFullControl
+      BucketName: codepipeline-eu-west-1-demo
+      MetricsConfigurations: 
+        - Id: EntireBucket
+      OwnershipControls: 
+        Rules:
+         - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+#S3 Policy
+  CodePipelineArtifactStoreBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref CodePipelineArtifactStoreBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': 'aws:kms'
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: !Join 
+              - ''
+              - - !GetAtt 
+                  - CodePipelineArtifactStoreBucket
+                  - Arn
+                - /*
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+#Cloudwatch Events Role
+  AmazonCloudWatchEventRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'codepipeline:StartPipelineExecution'
+                Resource: !Join 
+                  - ''
+                  - - 'arn:aws:codepipeline:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':'
+                    - !Ref AppPipeline
+#CloudWatch Events Rule
+  AmazonCloudWatchEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - CodeCommit Repository State Change
+        resources:
+          - !Join 
+            - ''
+            - - 'arn:aws:codecommit:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref RepoName
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - develop
+      Targets:
+        - Arn: !Join 
+            - ''
+            - - 'arn:aws:codepipeline:'
+              - !Ref 'AWS::Region'
+              - ':'
+              - !Ref 'AWS::AccountId'
+              - ':'
+              - !Ref AppPipeline
+          RoleArn: !GetAtt 
+            - AmazonCloudWatchEventRole
+            - Arn
+          Id: codepipeline-AppPipeline
+#Code Build
+  DevInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref Build1
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: eu-west-1
+            Type: PLAINTEXT
+          - Name: AWS_ACCOUNT_ID
+            Value: '871157674040'
+            Type: PLAINTEXT
+          - Name: IMAGE_REPO_NAME
+            Value: dev-invoice_extraction_app
+            Type: PLAINTEXT
+          - Name: ENV
+            Value: TEST
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      QueuedTimeoutInMinutes: 480
+      SecondaryArtifacts:
+      - ArtifactIdentifier: ImageArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: dev-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      - ArtifactIdentifier: DefinitionArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: dev-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      ServiceRole: arn:aws:iam::871157674040:role/service-role/codebuild-dev-invoice_extraction_app-service-role
+      Source:
+        BuildSpec: aws/buildspec.yml
+        GitCloneDepth: 1
+        Location: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/invoice_extraction-demo
+        Type: CODECOMMIT
+      SourceVersion: refs/heads/develop 
+      TimeoutInMinutes: 60
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: False
+          Location: !Ref CodePipelineArtifactStoreBucket
+          Status: ENABLED
+#CodeBuild Invoice Unit Testing Dev
+  DevUnitProdInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    # DependsOn: EFSDEMO
+    Properties:
+      Name: !Ref Build2
+      Artifacts:
+        EncryptionDisabled: false
+        Name: unittest-dev-invoice_extraction_app
+        Packaging: NONE
+        Type: CODEPIPELINE
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: '871157674040.dkr.ecr.eu-west-1.amazonaws.com/dev-invoice_extraction_app:latest'
+        ImagePullCredentialsType: SERVICE_ROLE
+        EnvironmentVariables:
+          - Name: ENV
+            Value: DEV
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      FileSystemLocations:
+        - Identifier: models
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/dev/models'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /models
+          Type: EFS
+        - Identifier: config
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/dev/config'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /config
+          Type: EFS
+        - Identifier: data
+          Location: !Sub 
+          - '${EFS}.efs.eu-west-1.amazonaws.com:/dev/app/data'
+          - EFS: !Ref EFSDEMO
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /app/data
+          Type: EFS
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: false
+          Location: !Ref CodePipelineArtifactStoreBucket
+          Status: ENABLED
+      QueuedTimeoutInMinutes: 480
+      ServiceRole: arn:aws:iam::871157674040:role/codebuild-unittest-dev-invoice_extraction_app-service-role
+      Source:
+        BuildSpec: 'aws/unit/buildspec.yml'
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 60
+      Visibility: PRIVATE
+      VpcConfig:
+        SecurityGroupIds:
+        - sg-09d40f93776324bef
+        Subnets:
+        - subnet-0e87cfbd496675012
+        - subnet-05677243c8da07bf5
+        VpcId: vpc-047fce4aba1e80567
+
+#Invoice Extraction Dev Pipeline
+  AppPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    # DependsOn: [DevUnitTestInvoiceExtractionApp, DevInvoiceExtractionApp, DgpECSBilMicroservicesDevInvoiceExtractionAppDemo]
+    Properties:
+      RoleArn: arn:aws:iam::871157674040:role/service-role/AWSCodePipelineServiceRole-eu-west-1-dev-invoice_extraction_app
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: !Ref BranchName
+                RepositoryName: !Ref RepoName
+                OutputArtifactFormat: CODE_ZIP
+                PollForSourceChanges: false
+              Namespace: SourceVariables
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Build
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref Build1
+              OutputArtifacts:
+                - Name: DefinitionArtifact
+                - Name: ImageArtifact
+              Namespace: BuildVariables
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Test
+          Actions:
+            - Name: Test
+              InputArtifacts:
+                - Name: SourceArtifact
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref Build2
+              OutputArtifacts: []
+              Region: eu-west-1
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              InputArtifacts:
+                - Name: DefinitionArtifact
+                - Name: ImageArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeployToECS
+              Configuration:
+                AppSpecTemplateArtifact: DefinitionArtifact
+                AppSpecTemplatePath: appspec.yml
+                ApplicationName: !Ref Appcodedeploy
+                DeploymentGroupName: !Ref DgpECSBilMicroservicesDevInvoiceExtractionAppDemo
+                Image1ArtifactName: ImageArtifact
+                Image1ContainerName: IMAGE1_NAME
+                TaskDefinitionTemplateArtifact: DefinitionArtifact
+                TaskDefinitionTemplatePath: taskdef.json
+              Region: eu-west-1                
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineArtifactStoreBucket
+

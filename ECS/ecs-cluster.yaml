@@ -1,0 +1,12 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL ECS Repository
+Resources:
+ Name:
+  Type: AWS::ECS::Cluster
+  Properties: 
+
+    ClusterName: bil-microservices-demo
+    ClusterSettings: 
+      - name: containerInsights
+        value: enabled

@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation BIL
+Resources:
+  EFSDEMO:
+    Type: AWS::EFS::FileSystem
+    Properties: 
+      BackupPolicy: 
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags: 
+      - Key: Name
+        Value: 'invoice_data_extraction-demo'
+      KmsKeyId: !GetAtt
+        - key
+        - Arn 
+      LifecyclePolicies: 
+      - TransitionToIA: AFTER_30_DAYS
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-05677243c8da07bf5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSDEMO
+      SubnetId: 'subnet-0cee8c1d17cecfce5'
+      SecurityGroups: [sg-03e653933d89593ef, sg-05d99bf8c6bcf36bd, sg-084e8fd62b48a8de1]
+
+  key:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-default-1
+        Statement:
+          - Sid: Allow administration of the key
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - 'kms:*'
+            Resource: 
+              - '*'
+ 

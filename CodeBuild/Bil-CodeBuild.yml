@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  DevInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: dev-invoice_extraction_app-demo
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: eu-west-1
+            Type: PLAINTEXT
+          - Name: AWS_ACCOUNT_ID
+            Value: '871157674040'
+            Type: PLAINTEXT
+          - Name: IMAGE_REPO_NAME
+            Value: dev-invoice_extraction_app
+            Type: PLAINTEXT
+          - Name: ENV
+            Value: TEST
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      QueuedTimeoutInMinutes: 480
+      SecondaryArtifacts:
+      - ArtifactIdentifier: ImageArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: dev-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      - ArtifactIdentifier: DefinitionArtifact
+        EncryptionDisabled: false
+        Location: codepipeline-eu-west-1-746302643285
+        Name: dev-invoice_extraction_app
+        Packaging: ZIP
+        Path: ''
+        Type: S3
+      ServiceRole: arn:aws:iam::871157674040:role/service-role/codebuild-dev-invoice_extraction_app-service-role
+      Source:
+        BuildSpec: aws/buildspec.yml
+        GitCloneDepth: 1
+        Location: https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/invoice_extraction
+        Type: CODECOMMIT
+      SourceVersion: refs/heads/develop 
+      TimeoutInMinutes: 60
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: False
+          Location: codepipeline-eu-west-1-746302643285/logs/dev-invoice_extraction_app
+          Status: ENABLED
+  DevUnitTestInvoiceExtractionApp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: unittest-dev-invoice_extraction_app-demo
+      Artifacts:
+        EncryptionDisabled: false
+        Name: unittest-dev-invoice_extraction_app
+        Packaging: NONE
+        Type: CODEPIPELINE
+      EncryptionKey: arn:aws:kms:eu-west-1:871157674040:alias/aws/s3
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: '871157674040.dkr.ecr.eu-west-1.amazonaws.com/dev-invoice_extraction_app:latest'
+        ImagePullCredentialsType: SERVICE_ROLE
+        EnvironmentVariables:
+          - Name: ENV
+            Value: DEV
+            Type: PLAINTEXT
+        PrivilegedMode: True
+      FileSystemLocations:
+        - Identifier: models
+          Location: fs-074ddc0a18305dd85.efs.eu-west-1.amazonaws.com:/dev/models
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /models
+          Type: EFS
+        - Identifier: config
+          Location: fs-074ddc0a18305dd85.efs.eu-west-1.amazonaws.com:/dev/config
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /config
+          Type: EFS
+        - Identifier: data
+          Location: fs-074ddc0a18305dd85.efs.eu-west-1.amazonaws.com:/dev/app/data
+          MountOptions: nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+          MountPoint: /app/data
+          Type: EFS
+      LogsConfig:
+        S3Logs:
+          EncryptionDisabled: false
+          Location: codepipeline-eu-west-1-746302643285/logs/unittest-dev-invoice_extraction_app
+          Status: ENABLED
+      QueuedTimeoutInMinutes: 480
+      ServiceRole: arn:aws:iam::871157674040:role/codebuild-unittest-dev-invoice_extraction_app-service-role
+      Source:
+        BuildSpec: 'aws/unit/buildspec.yml'
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 60
+      Visibility: PRIVATE
+      VpcConfig:
+        SecurityGroupIds:
+        - sg-09d40f93776324bef
+        Subnets:
+        - subnet-0e87cfbd496675012
+        - subnet-05677243c8da07bf5
+        VpcId: vpc-047fce4aba1e80567
+
+
+  # CodeBuildRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #       - Action: ['sts:AssumeRole']
+  #         Effect: Allow
+  #         Principal:
+  #           Service: [codebuild.amazonaws.com]
+  #       Version: '2012-10-17'
+  #     Path: /
+  #     Policies:
+  #       - PolicyName: CodeBuildAccess
+  #         PolicyDocument:
+  #           Version: '2012-10-17'
+  #           Statement:
+  #             - Action:
+  #               - 'logs:*'
+  #               - 'ec2:CreateNetworkInterface'
+  #               - 'ec2:DescribeNetworkInterfaces'
+  #               - 'ec2:DeleteNetworkInterface'
+  #               - 'ec2:DescribeSubnets'
+  #               - 'ec2:DescribeSecurityGroups'
+  #               - 'ec2:DescribeDhcpOptions'
+  #               - 'ec2:DescribeVpcs'
+  #               - 'ec2:CreateNetworkInterfacePermission'
+  #               Effect: Allow
+  #               Resource: '*'

@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Code Commit Repository for Invoice AI
+Resources:
+  BILRepositories:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      Code:
+        BranchName: develop
+        S3: 
+          Bucket: 'invoice-extraction-eu'
+          Key: 'codecommit/invoice-migration-branch.zip'
+          # ObjectVersion: String
+      RepositoryName: invoice_extraction-demo-demo
+      RepositoryDescription: "Extract data from pdf invoices- This project is part of the global Invoice Ingestion process at Corcentric with the goal to automate as much as possible ingestion of pdf based invoices.
+It is meant to automatically read any invoice from any supplier, primarirly coming from US, Canada, France, benelux and UK (Mainly English and French languages)."
+
+
+

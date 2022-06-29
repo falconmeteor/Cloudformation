@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: BIL Cloudformation
+Resources:
+  ECSServiceInvoiceExtractionAppDemo:
+    Type: AWS::ECS::Service
+    Properties: 
+      Cluster: arn:aws:ecs:eu-west-1:871157674040:cluster/bil-microservices-demo
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: CODE_DEPLOY
+      DesiredCount: 2
+      EnableECSManagedTags: true
+      EnableExecuteCommand: false  
+      LaunchType: EC2
+      LoadBalancers:
+      - ContainerName: app
+        ContainerPort: 8080
+        TargetGroupArn: arn:aws:elasticloadbalancing:eu-west-1:871157674040:targetgroup/bms-invoice-extraction-dev-tg-3/804f21d70b008a47
+      PlacementStrategies:
+      - Field: attribute:ecs.availability-zone
+        Type: spread
+      - Field: instanceId
+        Type: spread
+      SchedulingStrategy: REPLICA
+      ServiceName: dev-invoice_extraction_app-demo
+      TaskDefinition: arn:aws:ecs:eu-west-1:871157674040:task-definition/dev_invoice_extraction_app:238

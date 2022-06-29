@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS CloudFormation BIL
+Resources:
+  IE2:
+    Type: AWS::S3::Bucket
+    Properties: 
+      # AccelerateConfiguration: 
+      #   AccelerateConfiguration
+      AccessControl: BucketOwnerFullControl
+      # AnalyticsConfigurations: 
+      #   - AnalyticsConfiguration
+      # BucketEncryption: 
+      #   BucketEncryption
+      BucketName: invoice-extraction-us-demo
+      # CorsConfiguration: 
+      #   CorsConfiguration
+      # IntelligentTieringConfigurations: 
+      #   - IntelligentTieringConfiguration
+      # InventoryConfigurations: 
+      #   - InventoryConfiguration
+      # LifecycleConfiguration: 
+      #   LifecycleConfiguration
+      # LoggingConfiguration: 
+      #   LoggingConfiguration
+      MetricsConfigurations: 
+        - Id: EntireBucket
+      # NotificationConfiguration: 
+      #   NotificationConfiguration
+      # ObjectLockConfiguration: 
+      #   ObjectLockConfiguration
+      # ObjectLockEnabled: Boolean
+      OwnershipControls: 
+        Rules:
+         - ObjectOwnership: ObjectWriter
+      # PublicAccessBlockConfiguration: 
+      #   BlockPublicAcls: true
+      #   BlockPublicPolicy: true
+      #   IgnorePublicAcls: true
+      #   RestrictPublicBuckets: true
+      # ReplicationConfiguration: 
+      #   ReplicationConfiguration
+      # Tags: 
+      #   - Tag
+      # VersioningConfiguration: 
+      #   VersioningConfiguration
+      # WebsiteConfiguration: 
+      #   WebsiteConfiguration
